@@ -3,7 +3,10 @@ import torch.nn as nn
 import torch.nn.utils.prune as prune
 from termcolor import colored
 import logging
-from bayesian_torch.models.bayesian.resnet_variational import resnet20
+from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet20_bayesian
+from bayesian_torch.models.deterministic.resnet import resnet20 as resnet20_deterministic
+from bayesian_torch.models.bayesian.densenet_variational import densenet_bc_30_uni
+from bayesian_torch.models.deterministic.densenet import densenet_bc_30
 import argparse
 
 def prune_model(model, sparsity, logger):
@@ -67,9 +70,9 @@ def get_model(args, logger):
     if args.type == 'dnn':
         
         if args.model == 'resnet20':
-            pass
+            model = resnet20_deterministic(num_classes=num_classes)
         elif args.model == 'densenet30':
-            pass
+            model = densenet_bc_30(num_classes=num_classes)
         elif args.model == 'vit-tiny-layernorm-nano':
             pass
         elif args.model == 'mlp':
@@ -80,9 +83,9 @@ def get_model(args, logger):
     elif args.type == 'uni':
         
         if args.model == 'resnet20':
-            model = resnet20(num_classes = num_classes)
+            model = resnet20_bayesian(num_classes = num_classes, prior_type=args.prior_type)
         elif args.model == 'densenet30':
-            pass
+            model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type)
         elif args.model == 'vit-tiny-layernorm-nano':
             pass
         elif args.model == 'mlp':
@@ -94,7 +97,7 @@ def get_model(args, logger):
         raise ValueError(f"Unknown model type: {args.type}")
     
     total_params, trainable_params = check_params(model)
-    logging.info(colored(f"Total parameters: {total_params}, Trainable parameters: {trainable_params}", 'yellow'))
+    logging.info(colored(f"Total parameters: {total_params:,}, Trainable parameters: {trainable_params:,}", 'yellow'))
     
     return model
 
@@ -104,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument('--type', type=str, default='uni', help='Model type (dnn or uni)')
     parser.add_argument('--data', type=str, default='cifar10', help='Dataset name')
     parser.add_argument('--model', type=str, default='resnet20', help='Model name')
+    parser.add_argument('--prior_type', type=str, default='normal', help='Prior type (normal or laplace)')
     args = parser.parse_args()
     
     logger = logging.getLogger()

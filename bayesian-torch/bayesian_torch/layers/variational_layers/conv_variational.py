@@ -238,6 +238,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
                  groups=1,
                  prior_mean=0,
                  prior_variance=1,
+                 prior_type=None,
                  posterior_mu_init=0,
                  posterior_rho_init=-3.0,
                  bias=True):
@@ -267,6 +268,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         if out_channels % groups != 0:
             raise ValueError('invalid in_channels size')
 
+        assert prior_type is not None, "prior_type must be specified for Conv2dReparameterization layer"
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -276,6 +278,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         self.groups = groups
         self.prior_mean = prior_mean
         self.prior_variance = prior_variance
+        self.prior_type = prior_type
         self.posterior_mu_init = posterior_mu_init,  # mean of weight
         # variance of weight --> sigma = log (1 + exp(rho))
         self.posterior_rho_init = posterior_rho_init,
@@ -347,10 +350,10 @@ class Conv2dReparameterization(BaseVariationalLayer_):
 
     def kl_loss(self):
         sigma_weight = torch.log1p(torch.exp(self.rho_kernel))
-        kl = self.kl_div(self.mu_kernel, sigma_weight, self.prior_weight_mu, self.prior_weight_sigma)
+        kl = self.kl_div(self.mu_kernel, sigma_weight, self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
         if self.bias:
             sigma_bias = torch.log1p(torch.exp(self.rho_bias))
-            kl += self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu, self.prior_bias_sigma)
+            kl += self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu, self.prior_bias_sigma, prior_type = self.prior_type)
 
         return kl
 
@@ -365,7 +368,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
 
         if return_kl:
             kl_weight = self.kl_div(self.mu_kernel, sigma_weight,
-                                    self.prior_weight_mu, self.prior_weight_sigma)
+                                    self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
         bias = None
 
         if self.bias:
@@ -374,7 +377,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
             bias = self.mu_bias + (sigma_bias * eps_bias)
             if return_kl:
                 kl_bias = self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu,
-                                      self.prior_bias_sigma)
+                                      self.prior_bias_sigma, prior_type = self.prior_type)
 
         out = F.conv2d(input, weight, bias, self.stride, self.padding,
                        self.dilation, self.groups)

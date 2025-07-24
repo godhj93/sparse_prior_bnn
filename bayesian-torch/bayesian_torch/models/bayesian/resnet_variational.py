@@ -41,7 +41,7 @@ class LambdaLayer(nn.Module):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, option='A'):
+    def __init__(self, in_planes, planes, stride=1, option='A', prior_type=None):
         super(BasicBlock, self).__init__()
         self.conv1 = Conv2dReparameterization(
             in_channels=in_planes,
@@ -51,6 +51,7 @@ class BasicBlock(nn.Module):
             padding=1,
             prior_mean=prior_mu,
             prior_variance=prior_sigma,
+            prior_type=prior_type,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
             bias=False)
@@ -63,6 +64,7 @@ class BasicBlock(nn.Module):
             padding=1,
             prior_mean=prior_mu,
             prior_variance=prior_sigma,
+            prior_type=prior_type,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
             bias=False)
@@ -86,6 +88,7 @@ class BasicBlock(nn.Module):
                         stride=stride,
                         prior_mean=prior_mu,
                         prior_variance=prior_sigma,
+                        prior_type=prior_type,
                         posterior_mu_init=posterior_mu_init,
                         posterior_rho_init=posterior_rho_init,
                         bias=False), nn.BatchNorm2d(self.expansion * planes))
@@ -103,9 +106,8 @@ class BasicBlock(nn.Module):
         out = F.relu(out)
         return out, kl_sum
 
-
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, num_blocks, num_classes=10, prior_type=None):
         super(ResNet, self).__init__()
         self.in_planes = 16
 
@@ -117,29 +119,31 @@ class ResNet(nn.Module):
             padding=1,
             prior_mean=prior_mu,
             prior_variance=prior_sigma,
+            prior_type = prior_type,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
             bias=False)
         self.bn1 = nn.BatchNorm2d(16)
-        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1, prior_type=prior_type)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2, prior_type=prior_type)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2, prior_type=prior_type)
         self.linear = LinearReparameterization(
             in_features=64,
             out_features=num_classes,
             prior_mean=prior_mu,
             prior_variance=prior_sigma,
+            prior_type=prior_type,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
         )
 
         self.apply(_weights_init)
 
-    def _make_layer(self, block, planes, num_blocks, stride):
+    def _make_layer(self, block, planes, num_blocks, stride, prior_type):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
+            layers.append(block(in_planes = self.in_planes, planes = planes, stride = stride, prior_type = prior_type))
             self.in_planes = planes * block.expansion
 
         return nn.Sequential(*layers)
@@ -167,8 +171,8 @@ class ResNet(nn.Module):
         return out, kl_sum
 
 
-def resnet20():
-    return ResNet(BasicBlock, [3, 3, 3])
+def resnet20(num_classes, prior_type):
+    return ResNet(BasicBlock, [3, 3, 3], num_classes=num_classes, prior_type=prior_type)
 
 
 def resnet32():
