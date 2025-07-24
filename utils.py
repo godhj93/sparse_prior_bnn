@@ -7,6 +7,9 @@ from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet
 from bayesian_torch.models.deterministic.resnet import resnet20 as resnet20_deterministic
 from bayesian_torch.models.bayesian.densenet_variational import densenet_bc_30_uni
 from bayesian_torch.models.deterministic.densenet import densenet_bc_30
+from bayesian_torch.models.deterministic.vit_tiny_dnn import ViT_Tiny_dnn, vit_tiny_dnn
+from bayesian_torch.models.bayesian.vit_tiny_uni import ViT_Tiny_uni, vit_tiny_uni
+
 import argparse
 
 def prune_model(model, sparsity, logger):
@@ -74,7 +77,7 @@ def get_model(args, logger):
         elif args.model == 'densenet30':
             model = densenet_bc_30(num_classes=num_classes)
         elif args.model == 'vit-tiny-layernorm-nano':
-            pass
+            model = vit_tiny_dnn(num_classes=num_classes, model='nano')
         elif args.model == 'mlp':
             pass
         else:
@@ -87,7 +90,7 @@ def get_model(args, logger):
         elif args.model == 'densenet30':
             model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type)
         elif args.model == 'vit-tiny-layernorm-nano':
-            pass
+            model = vit_tiny_uni(num_classes=num_classes, model='nano', prior_type=args.prior_type)
         elif args.model == 'mlp':
             pass
         else:
