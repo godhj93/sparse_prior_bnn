@@ -199,19 +199,37 @@ def test_ood_detection_dnn(model, in_loader, out_loader, n_bins=15, args=None):
     # ──────────────────────────────────────────────────────
     # OOD 검출을 위한 AUROC 계산 (MSP와 Entropy)
     # ──────────────────────────────────────────────────────
-    for method in ['msp', 'entropy']:
-        scores = np.array(results[method]['scores'])
-        labels = np.array(results[method]['labels'])
+
+    # MSP Calculation
+    print("\nCalculating AUROC for OOD detection...")
+    scores = np.array(results['msp']['scores'])
+    labels = np.array(results['msp']['labels'])
+    auroc_msp = roc_auc_score(labels, -scores)  # MSP는 ID일수록 큰 값이므로 음수 반전
+    print(f"AUROC (MSP): {auroc_msp:.4f}")
+
+    # Entropy Calculation
+    scores = np.array(results['entropy']['scores'])
+    labels = np.array(results['entropy']['labels'])
+    auroc_entropy = roc_auc_score(labels, scores)
+    print(f"AUROC (Entropy): {auroc_entropy:.4f}")
+
+
+    # for method in ['msp', 'entropy']:
+    #     scores = np.array(results[method]['scores'])
+    #     labels = np.array(results[method]['labels'])
         
-        # MSP의 경우, in-distribution일수록 큰 값이므로 OOD 검출을 위해 음수 반전
-        if method == 'msp':
-            scores = -scores
+    #     # MSP의 경우, in-distribution일수록 큰 값이므로 OOD 검출을 위해 음수 반전
+    #     if method == 'msp':
+    #         scores = -scores
         
-        fpr, tpr, thresholds = roc_curve(labels, scores)
-        auroc = roc_auc_score(labels, scores)
-        print(f"AUROC ({method.upper()}): {auroc:.4f}")
+    #     fpr, tpr, thresholds = roc_curve(labels, scores)
+    #     auroc = roc_auc_score(labels, scores)
+    #     print(f"AUROC ({method.upper()}): {auroc:.4f}")
     
-    return results
+    return {'ece': ece, 
+            'auroc_msp': auroc_msp, 
+            'auroc_entropy': auroc_entropy,
+    }
 
 def test_ood_detection_bnn(model, in_loader, out_loader, mc_runs=30, n_bins=15, args=None):
     model.eval().cuda()
@@ -305,20 +323,44 @@ def test_ood_detection_bnn(model, in_loader, out_loader, mc_runs=30, n_bins=15, 
     # OOD 검출용 AUROC (MSP/Entropy/MI) + ECE subplot
     # ──────────────────────────────────────────────────────
     
-    for i, method in enumerate(['msp', 'entropy', 'mi']):
-        scores = np.array(results[method]['scores'])
-        labels = np.array(results[method]['labels'])
+    # MSP Calculation
+    print("\nCalculating AUROC for OOD detection...")
+    scores = np.array(results['msp']['scores'])
+    labels = np.array(results['msp']['labels'])
+    auroc_msp = roc_auc_score(labels, -scores)  # MSP는 ID일수록 큰 값이므로 음수 반전
+    print(f"AUROC (MSP): {auroc_msp:.4f}")
+
+    # Entropy Calculation
+    scores = np.array(results['entropy']['scores'])
+    labels = np.array(results['entropy']['labels'])
+    auroc_entropy = roc_auc_score(labels, scores)
+    print(f"AUROC (Entropy): {auroc_entropy:.4f}")
+
+    # Mutual Information Calculation
+    scores = np.array(results['mi']['scores'])
+    labels = np.array(results['mi']['labels'])
+    auroc_mi = roc_auc_score(labels, scores)
+    print(f"AUROC (Mutual Information): {auroc_mi:.4f}")
+
+
+    # for i, method in enumerate(['msp', 'entropy', 'mi']):
+    #     scores = np.array(results[method]['scores'])
+    #     labels = np.array(results[method]['labels'])
         
-        # MSP는 ID일수록 값이 크므로, OOD 점수로 쓰기 위해 음수 반전
-        if method == 'msp':
-            scores = -scores
+    #     # MSP는 ID일수록 값이 크므로, OOD 점수로 쓰기 위해 음수 반전
+    #     if method == 'msp':
+    #         scores = -scores
         
-        fpr, tpr, thresholds = roc_curve(labels, scores)
-        auroc = roc_auc_score(labels, scores)
-        summary_results[f'auroc_{method}'] = auroc
-        print(f"AUROC ({method.upper()}): {auroc:.4f}")
+    #     fpr, tpr, thresholds = roc_curve(labels, scores)
+    #     auroc = roc_auc_score(labels, scores)
+    #     summary_results[f'auroc_{method}'] = auroc
+    #     print(f"AUROC ({method.upper()}): {auroc:.4f}")
     
-    return results
+    return {'ece': ece, 
+            'auroc_msp': auroc_msp, 
+            'auroc_entropy': auroc_entropy,
+            'auroc_mi': auroc_mi,}
+    
 
 def compute_ece_and_plot_confidence_vs_accuracy_batches(confidences_batches, preds_batches, labels_batches, n_bins=15):
     
@@ -399,6 +441,72 @@ def compute_mutual_information(mc_probabilities):
 
     return mutual_information, predictive_entropy
 
+def evaluate(model, best_model_weight, device, args, logger):
+
+    model.load_state_dict(best_model_weight)
+    model.eval()
+    logger.info(colored(f"Pretrained model weights loaded", 'green'))
+
+    import json
+    from datetime import datetime
+
+    experiment_results = {
+        'info': {},
+        'id_performance': {},
+        'ood_performance': {}
+    }
+
+    for key, value in vars(args).items():
+        # Skip MultiStepLR and optimizer
+        if key in ['scheduler', 'optimizer']:
+            continue
+        experiment_results['info'][key] = value
+
+    # ──────────────────────────────────────────────
+    # ID Evaluation
+    # ──────────────────────────────────────────────
+    _, test_loader = get_dataset(args=args, logger=logger)
+    args.in_data = args.data    
+    if args.type == 'dnn':
+        acc, nll = test_DNN(model, test_loader, device, args)
+        print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}", 'blue'))
+        experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll}
+    
+    elif args.type == 'uni':
+        acc, nll, kld = test_BNN(model=model, test_loader=test_loader, bs=args.bs, device=device, mc_runs=args.mc_runs, args=args)
+        print(f"Dataset: {args.data}")
+        print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}, KLD: {kld:.4f}", 'blue'))
+        experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll, 'kld': kld}
+
+    else:
+        raise NotImplementedError("Not implemented yet")
+    
+    # ──────────────────────────────────────────────
+    # OOD Evaluation
+    # ──────────────────────────────────────────────
+    if args.ood is not None:
+        for ood in args.ood:
+            args.data = ood
+            print(f"Out of Distribution Dataset: {args.data}")
+            _, out_data_loader = get_dataset(args, logger=logger)
+            
+            if args.type == 'dnn':
+                experiment_results['ood_performance'][ood] = test_ood_detection_dnn(model, test_loader, out_data_loader, args=args)
+
+            elif args.type == 'uni':
+                experiment_results['ood_performance'][ood] = test_ood_detection_bnn(model, test_loader, out_data_loader, mc_runs=args.mc_runs, args=args)
+            else:
+                raise NotImplementedError("Not implemented yet")
+    else:
+        print(colored("No OOD datasets specified. Skipping OOD evaluation.", 'red'))
+    # ──────────────────────────────────────────────
+    # 최종 결과 파일 저장
+    # ──────────────────────────────────────────────
+    save_path = args.weight.replace('.pth', '_results.json')
+    with open(save_path, 'w') as f:
+        json.dump(experiment_results, f, indent=4)
+    print(colored(f"\nAll experiment results saved to: {save_path}", 'magenta'))
+
 def main(args):
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -410,6 +518,10 @@ def main(args):
     console_handler.setLevel(logging.INFO)
     
     model = get_model(args = args, logger = logger)
+    best_model_weight = torch.load(args.weight, map_location=device)
+
+    evaluate(model, best_model_weight, device, args, logger)
+    '''
     model.load_state_dict(torch.load(args.weight))
     print(colored(f"Pretrained weight is loaded from {args.weight}", 'green'))
     
@@ -463,15 +575,15 @@ def main(args):
         print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}, KLD: {kld:.4f}", 'blue'))
         experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll, 'kld': kld}
         
-        print(colored("\n--- Checking Loss Flatness (Tr(C_theta)) ---", 'yellow'))
-        tr_c = compute_tr_c_bnn(model, test_loader, device, args.mc_runs)
-        print(colored(f"Tr(C_theta): {tr_c:.4f}\n", 'yellow'))
+        # print(colored("\n--- Checking Loss Flatness (Tr(C_theta)) ---", 'yellow'))
+        # tr_c = compute_tr_c_bnn(model, test_loader, device, args.mc_runs)
+        # print(colored(f"Tr(C_theta): {tr_c:.4f}\n", 'yellow'))
         
-        print(colored(f"\n--- Checking Loss Flatness (Tr(H_phi)) ---", 'green'))
-        tr_h = compute_tr_h_bnn(model, test_loader, criterion=torch.nn.CrossEntropyLoss(), device=device, mc_runs=args.mc_runs)
-        print(colored(f"Tr(H_phi): {tr_h:.4f}\n", 'green'))
+        # print(colored(f"\n--- Checking Loss Flatness (Tr(H_phi)) ---", 'green'))
+        # tr_h = compute_tr_h_bnn(model, test_loader, criterion=torch.nn.CrossEntropyLoss(), device=device, mc_runs=args.mc_runs)
+        # print(colored(f"Tr(H_phi): {tr_h:.4f}\n", 'green'))
         
-        experiment_results['flatness_metric'] = {'tr_c_theta': tr_c, 'tr_h_phi': tr_h}
+        # experiment_results['flatness_metric'] = {'tr_c_theta': tr_c, 'tr_h_phi': tr_h}
         
         if args.ood is not None:
             for ood in args.ood:
@@ -500,6 +612,7 @@ def main(args):
         
     print(colored(f"\nAll experiment results saved to: {save_path}", 'magenta'))
     # ----------------------------------------------------------------------
+    '''
 
 if __name__ == '__main__':
     
@@ -513,6 +626,7 @@ if __name__ == '__main__':
     parser.add_argument('--ood', nargs='+', help='Out-of-distribution datasets')
     parser.add_argument('--scale', type=str, default='N', help='KLD scale')
     parser.add_argument('--prior_type', type=str, help='Prior type [normal, laplace]')
+    parser.add_argument('--multi-gpu', action='store_true', help='Use multi-GPU')
 
     args = parser.parse_args()
     

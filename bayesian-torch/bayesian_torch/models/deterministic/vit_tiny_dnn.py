@@ -8,7 +8,7 @@ from bayesian_torch.models.dnn_to_bnn import dnn_to_bnn, get_kl_loss
 __all__ = ['ViT_Tiny_dnn', 'vit_tiny_dnn']
 
 class ViT_Tiny_dnn(nn.Module):
-    def __init__(self, num_classes=100, model = 'nano'):
+    def __init__(self, img_size = 32, num_classes=100, model = 'nano'):
         super().__init__()
         
         # load ViT backbone
@@ -24,7 +24,7 @@ class ViT_Tiny_dnn(nn.Module):
             )
         elif model == 'nano':
             self.base_model = VisionTransformer(
-                img_size=32,
+                img_size=img_size,
                 patch_size=8,       # 큰 패치로 시퀀스 길이를 16으로 단축
                 embed_dim=96,       # 임베딩 차원을 낮게 설정
                 depth=4,            # 얕은 깊이
@@ -61,7 +61,7 @@ class ViT_Tiny_dnn(nn.Module):
         out = self.base_model(x)
         return out
 
-def vit_tiny_dnn(num_classes=100, model='nano'):
+def vit_tiny_dnn(img_size, num_classes=100, model='nano'):
     """
     Create a ViT Tiny model with DNN to BNN conversion.
     
@@ -72,6 +72,6 @@ def vit_tiny_dnn(num_classes=100, model='nano'):
     Returns:
         ViT_Tiny_dnn: Configured ViT Tiny model.
     """
-    model = ViT_Tiny_dnn(num_classes=num_classes, model=model)
+    model = ViT_Tiny_dnn(img_size, num_classes=num_classes, model=model)
     
     return model

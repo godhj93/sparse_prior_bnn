@@ -7,6 +7,7 @@ from utils import get_model, get_dataset, train_DNN, train_BNN, test_DNN, prune_
 from termcolor import colored
 from torch.utils.tensorboard import SummaryWriter
 import os
+from test import evaluate
 
 def main(args):
     
@@ -105,8 +106,10 @@ def main(args):
                         args=args,
                         logger=logger): break
                 
+            best_model_weight = None
+                
         else:
-            train_DNN(epoch=args.epochs, 
+            best_model_weight = train_DNN(epoch=args.epochs, 
                     model=model, 
                     train_loader=train_loader, 
                     test_loader=test_loader, 
@@ -115,9 +118,11 @@ def main(args):
                     device=device,
                     args=args,
                     logger=logger)
+            
+            
 
     else:
-        train_BNN(epoch=args.epochs, 
+        best_model_weight = train_BNN(epoch=args.epochs, 
                   model=model, 
                   train_loader=train_loader, 
                   test_loader=test_loader, 
@@ -128,6 +133,13 @@ def main(args):
                   device=device,
                   args=args,
                   logger=logger)
+
+    # Let's test the model after training
+    if best_model_weight is not None:
+        evaluate(model, best_model_weight, device, args, logger)
+    
+    else:
+        logger.info(colored("No best model weight found. Skipping evaluation.", 'red'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train a Bayesian Neural Network')
@@ -152,7 +164,7 @@ if __name__ == "__main__":
     parser.add_argument('--multi-gpu', action='store_true', help='Use multi-GPU')
     parser.add_argument('--weight', type=str, help='DNN weight path for initialization')
     parser.add_argument('--moped', action='store_true', help='DO NOT USE')
-
+    parser.add_argument('--ood', type=str, nargs='*', default=None, help='OOD datasets to evaluate')
     args = parser.parse_args()
     print(colored(args, 'blue'))
 

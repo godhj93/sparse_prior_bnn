@@ -93,7 +93,10 @@ def get_model(args, logger):
         elif args.model == 'densenet30':
             model = densenet_bc_30(num_classes=num_classes)
         elif args.model == 'vit-tiny-layernorm-nano':
-            model = vit_tiny_dnn(num_classes=num_classes, model='nano')
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='nano')
+            else:
+                model = vit_tiny_dnn(num_classes=num_classes, model='nano')
         elif args.model == 'mlp':
             pass
         else:
@@ -367,6 +370,9 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
             torch.save(model.state_dict(), os.path.join(writer.log_dir, 'best_nll_model.pth'))
             logger.info(f"Best NLL model saved at epoch {e}")
             
+            best_model_weight = copy.deepcopy(model.state_dict())   
+            args.weight = os.path.join(writer.log_dir, 'best_nll_model.pth')
+
         if best_acc < acc_test:
             best_acc = acc_test
             torch.save(model.state_dict(), os.path.join(writer.log_dir, 'best_acc_model.pth'))
@@ -381,6 +387,7 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
     torch.save(model.state_dict(), os.path.join(writer.log_dir, 'last_model.pth'))
     logger.info(f"Last model saved")
     
+    return best_model_weight
 
 def test_BNN(model, test_loader, bs, device, args, moped=False, mc_runs = 30):
     
@@ -488,7 +495,10 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
             best_loss = nll_test
             torch.save(model.state_dict(), os.path.join(writer.log_dir, 'best_model.pth'))
             logger.info(f"Best model saved at epoch {e+1}")
-        
+
+            best_model_weight = copy.deepcopy(model.state_dict())
+            args.weight = os.path.join(writer.log_dir, 'best_model.pth')
+
         if args.prune:
 
             logger.info(f"Original best NLL: {args.best_nll:.4f}, Current NLL: {nll_test:.4f}")
@@ -526,9 +536,7 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
     torch.save(model.state_dict(), os.path.join(writer.log_dir, 'last_model.pth'))
     logger.info(f"Last model saved")
     
-    # model.load_state_dict(best_model_weight, strict=False)
-    # print(colored(f"Best model returned", 'green'))
-    
+    return best_model_weight
     
 def test_DNN(model, test_loader, device, args):
 
