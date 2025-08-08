@@ -7,6 +7,7 @@ import copy
 import logging
 import datetime
 from torch.utils.tensorboard import SummaryWriter
+from test import evaluate
 
 def main(args):
 
@@ -102,6 +103,10 @@ def main(args):
     logger.info(colored("Testing DNN", 'green'))
     logger.info(colored(f"Sparsity: {sparsity*100:.2f}%, Acc: {acc:.2f}%, Loss: {loss:.4f}", 'green'))
     
+    args.pruned_dnn_acc = acc
+    args.pruned_dnn_loss = loss
+    args.pruned_dnn_sparsity = sparsity
+
     # Set the prior for the convolutional layers
     dnn_conv_layers = get_conv_layers(dnn)
     bnn_conv_layers = get_conv_layers(bnn)
@@ -160,7 +165,7 @@ def main(args):
         for key, value in vars(args).items():
             f.write(f"{key}: {value}\n")
        
-    train_BNN(
+    best_model_weight = train_BNN(
         epoch = args.epochs,
         model = bnn.cuda(),
         train_loader = train_loader,
@@ -174,12 +179,19 @@ def main(args):
         logger = logger
     )
 
+    # Let's test the model after training
+    if best_model_weight is not None:
+        evaluate(bnn, best_model_weight, device, args, logger)
+    
+    else:
+        logger.info(colored("No best model weight found. Skipping evaluation.", 'red'))
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Train a Bayesian Neural Network')
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=90, help='Number of epochs to train')
     parser.add_argument('--mc_runs', type=int, default=1, help='Number of Monte Carlo runs')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-1, help='Learning rate')
     parser.add_argument('--lr_prior', type=float, default=1e-3, help='Learning rate for prior parameters')
     parser.add_argument('--ig_a', type=float, default=1.0, help='Inverse Gamma a parameter')
     parser.add_argument('--ig_b', type=float, default=1.0, help='Inverse Gamma b parameter')
@@ -204,8 +216,10 @@ if __name__ == '__main__':
     parser.add_argument('--std', type = float, default = 1e-3, help='Set a std for a good prior')
     parser.add_argument('--scale', type=str, default='BS', help='KLD scale')
     parser.add_argument('--prior_type', type=str, help='Prior type [normal, laplace]')
+    parser.add_argument('--ood', type=str, nargs='*', help='OOD datasets to evaluate')
 
     args = parser.parse_args()
     
+    assert args.ood is not None, "Please provide OOD datasets to evaluate using --ood argument."
     print(colored(f"Arguments: {args}", 'yellow'))
     main(args)
