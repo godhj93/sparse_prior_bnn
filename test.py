@@ -445,7 +445,7 @@ def evaluate(model, best_model_weight, device, args, logger):
 
     model.load_state_dict(best_model_weight)
     model.eval()
-    logger.info(colored(f"Pretrained model weights loaded", 'green'))
+    logger.info(colored(f"Pretrained model weights loaded", 'blue'))
 
     import json
     from datetime import datetime
@@ -453,7 +453,8 @@ def evaluate(model, best_model_weight, device, args, logger):
     experiment_results = {
         'info': {},
         'id_performance': {},
-        'ood_performance': {}
+        'ood_performance': {},
+        'clustering_performance': {},
     }
 
     for key, value in vars(args).items():
@@ -462,6 +463,7 @@ def evaluate(model, best_model_weight, device, args, logger):
             continue
         experiment_results['info'][key] = value
 
+    logger.info(colored(f"In dataset evaluation starting for {args.data}...", 'blue'))
     # ──────────────────────────────────────────────
     # ID Evaluation
     # ──────────────────────────────────────────────
@@ -481,10 +483,95 @@ def evaluate(model, best_model_weight, device, args, logger):
     else:
         raise NotImplementedError("Not implemented yet")
     
+    if args.data == 'cifar10':
+        logger.info(colored("Clustering performance evaluation starting...", 'blue'))
+        # TSNE
+        # 데이터 로드
+        from torchvision import datasets, transforms
+        from typing import List, Sequence
+        from tsne import extract_features, run_embedding, cluster_metrics, global_rank_corr
+        from torch.utils.data import DataLoader, Subset
+        
+        args.samples_per_class = 30
+
+        IMG_STATS = {
+            "TinyImageNet": ((0.4802, 0.4481, 0.3975),
+                            (0.2302, 0.2265, 0.2262)),
+            "cifar10": ((0.4914, 0.4822, 0.4465),
+                        (0.2023, 0.1994, 0.2010)),
+        }
+
+
+        CLASSIFICATION_DATASETS = {
+            "cifar10": lambda root: datasets.CIFAR10(
+                root=root,
+                train=False,
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["cifar10"]),
+                ]),
+                download=True,
+            ),
+
+            # # ★ 여기 root 경로 수정:  .../val  (images 아님!)
+            # "TinyImageNet": lambda root: ImageFolder(
+            #     root=os.path.join(root, "tiny-imagenet-200", "val"),
+            #     transform=transforms.Compose([
+            #         transforms.Resize((64, 64)),
+            #         transforms.ToTensor(),
+            #         transforms.Normalize(*IMG_STATS["TinyImageNet"]),
+            #     ]),
+            # ),
+        }
+        
+        dataset = CLASSIFICATION_DATASETS[args.data]("./data")
+        num_classes = len(dataset.classes)
+
+        counter = {i: 0 for i in range(num_classes)}
+        sel_idx: List[int] = []
+        for idx, (_, lbl) in tqdm(enumerate(dataset), total=len(dataset), desc="Sampling"):
+            if counter[lbl] < args.samples_per_class:
+                sel_idx.append(idx)
+                counter[lbl] += 1
+            if all(v >= args.samples_per_class for v in counter.values()):
+                break
+
+        loader = DataLoader(Subset(dataset, sel_idx), batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
+
+        feats, lbls = extract_features(model, loader, args.mc_runs, device)
+
+        #* [N, D] features and [N] labels
+
+        Y, kl = run_embedding(
+                feats.numpy(),
+                method=args.clustering_method,
+                perplexity=args.perplexity,
+                n_neighbors=args.n_neighbors,
+                min_dist=args.min_dist,
+            )
+
+        sil, db, pr, gv = cluster_metrics(Y, lbls.numpy())
+        rho = global_rank_corr(feats.numpy(), Y)
+
+        print("\n=== Metrics ===")
+        print(f"Silhouette={sil:.3f}  DaviesBouldin={db:.3f}  PR={pr:.2f}  GV={gv:.2e}  Spearmanρ={rho:.3f}\n")
+
+        experiment_results['clustering_performance'] = {
+            'silhouette': sil,
+            'davies_bouldin': db,
+            'pr': pr,
+            'global_variance': gv,
+            'spearman_rho': rho,
+        }
+    
+    else:
+        logger.warning("Clustering performance evaluation is only implemented for CIFAR-10 dataset.")
+
     # ──────────────────────────────────────────────
     # OOD Evaluation
     # ──────────────────────────────────────────────
     if args.ood is not None:
+        logger.info(colored("Out-of-Distribution evaluation starting...", 'blue'))
         for ood in args.ood:
             args.data = ood
             print(f"Out of Distribution Dataset: {args.data}")
@@ -499,6 +586,43 @@ def evaluate(model, best_model_weight, device, args, logger):
                 raise NotImplementedError("Not implemented yet")
     else:
         print(colored("No OOD datasets specified. Skipping OOD evaluation.", 'red'))
+
+    logger.info(colored("Adversarial attack evaluation starting...", 'blue'))
+    # Adversarial Attack Evaluation
+    from adversarialattack import fgsm_clf, pgd_clf, eval_clf
+    # FGSM
+    adv_data, adv_labels = [], []
+    for x,y in test_loader:
+        x_adv = fgsm_clf(model, x, y, args.eps, device=device)
+        adv_data.append(x_adv.cpu())
+        adv_labels.append(y.cpu())
+    
+    x_adv = torch.cat(adv_data, dim=0)
+    y_adv = torch.cat(adv_labels, dim=0)
+    adversarial_loader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
+    
+    fgsm_nll, fgsm_acc = eval_clf(model, adversarial_loader,
+                        mc_runs=args.mc_runs, device=device)
+    
+    # PGD
+    adv_data, adv_labels = [], []
+    for x,y in test_loader:
+        x_adv = pgd_clf(model, x, y, args.eps, device=device)
+        adv_data.append(x_adv.cpu())
+        adv_labels.append(y.cpu())
+    x_adv = torch.cat(adv_data, dim=0)
+    y_adv = torch.cat(adv_labels, dim=0)
+    adversarial_loader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
+    
+    pgd_nll, pgd_acc = eval_clf(model, adversarial_loader,
+                        mc_runs=args.mc_runs, device=device)
+    
+    experiment_results['adversarial_performance'] = {
+        'fgsm': {'nll': fgsm_nll, 'accuracy': fgsm_acc},
+        'pgd': {'nll': pgd_nll, 'accuracy': pgd_acc}
+    }
     # ──────────────────────────────────────────────
     # 최종 결과 파일 저장
     # ──────────────────────────────────────────────
@@ -627,7 +751,7 @@ if __name__ == '__main__':
     parser.add_argument('--scale', type=str, default='N', help='KLD scale')
     parser.add_argument('--prior_type', type=str, help='Prior type [normal, laplace]')
     parser.add_argument('--multi-gpu', action='store_true', help='Use multi-GPU')
-
+    parser.add_argument('--clustering_method', type=str, default='umap', help='Clustering method for visualization [tsne, umap]'   )
     args = parser.parse_args()
     
     print(colored(args, 'green'))

@@ -1,11 +1,9 @@
-import argparse, torch, numpy as np
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
-from torch.nn.utils import parameters_to_vector, vector_to_parameters
-from utils.models.densenet_uni import densenet_bc_30_uni
-from bayesian_torch.models.dnn_to_bnn import get_kl_loss
+# from utils.models.densenet_uni import densenet_bc_30_uni
 from tqdm import tqdm
+import torch
 
 """
 Dataset

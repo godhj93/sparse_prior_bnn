@@ -165,6 +165,12 @@ if __name__ == "__main__":
     parser.add_argument('--weight', type=str, help='DNN weight path for initialization')
     parser.add_argument('--moped', action='store_true', help='DO NOT USE')
     parser.add_argument('--ood', type=str, nargs='*', default=None, help='OOD datasets to evaluate')
+    parser.add_argument('--clustering_method', type=str, default='umap', help='Clustering method for visualization [tsne, umap]'   )
+    parser.add_argument('--perplexity', type=int, default=30)          # t‑SNE
+    parser.add_argument('--n_neighbors', type=int, default=15)         # UMAP
+    parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
+    parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
+
     args = parser.parse_args()
     print(colored(args, 'blue'))
 

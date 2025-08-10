@@ -20,17 +20,17 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 from tqdm import tqdm
 
-from utils.models.densenet_uni import densenet_bc_30_uni
-from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet20_uni
+# from utils.models.densenet_uni import densenet_bc_30_uni
+# from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet20_uni
 from torchvision.datasets import ImageFolder
 
-try:
-    from bayesian_torch.layers.variational_layers.conv_variational import (
-        Conv2dReparameterization,
-        Conv2dReparameterization_Multivariate,
-    )
-except ModuleNotFoundError:  # noqa: F401 – placeholder to keep import order
-    Conv2dReparameterization = Conv2dReparameterization_Multivariate = nn.Module
+# try:
+#     from bayesian_torch.layers.variational_layers.conv_variational import (
+#         Conv2dReparameterization,
+#         Conv2dReparameterization_Multivariate,
+#     )
+# except ModuleNotFoundError:  # noqa: F401 – placeholder to keep import order
+#     Conv2dReparameterization = Conv2dReparameterization_Multivariate = nn.Module
 
 
 IMG_STATS = {
@@ -121,6 +121,39 @@ def extract_features_densenet(
 
     h.remove()
     return torch.cat(feats, 0), torch.tensor(lbls)
+
+@torch.no_grad()
+def extract_features(
+    model: nn.Module,
+    loader: DataLoader,
+    mc_runs: int,
+    device: str = "cpu",
+):
+    """Return features [N,D] and labels [N] with tqdm progress."""
+    model.eval()
+    feats: List[torch.Tensor] = []
+    lbls: List[int] = []
+
+    def _hook(_, inp, __):  # inp[0] shape: [B, D]
+        feats.append(inp[0].detach().cpu())
+
+    # h = model[-1].register_forward_hook(_hook)
+
+    classifier = list(model.children())[-1]  # last layer
+    h = classifier.register_forward_hook(_hook)
+
+    total_iter = len(loader) * mc_runs
+    with tqdm(total=total_iter, desc="Extracting", unit="sample") as pbar:
+        for images, targets in loader:
+            images = images.to(device)
+            for _ in range(mc_runs):
+                model(images)
+                lbls.extend(targets.numpy().tolist())
+                pbar.update(1)
+
+    h.remove()
+    return torch.cat(feats, 0), torch.tensor(lbls)
+
 
 def _nearest_rank_matrix(X: np.ndarray, k_max: int) -> np.ndarray:
     nn = NearestNeighbors(n_neighbors=k_max + 1, n_jobs=-1)
@@ -316,6 +349,12 @@ def main():
         # prefix = f"{args.name}_" if args.name else ""
         # scatter_plot(Y, lbls, out_dir / f"{prefix}{args.method}.png")
         # print("[+] Saved plot →", (out_dir / f"{prefix}{args.method}.png").resolve())
+
+def run_tsne(model, dataset, device, args):
+    
+    model.eval()
+    
+
 
 if __name__ == "__main__":
     main()
