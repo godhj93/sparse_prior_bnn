@@ -131,13 +131,11 @@ def main(args):
         bnn_layer.prior_weight_sigma = std
         bnn_layer.prior_variance_hypo_a = prior_variance_hypo_a
         bnn_layer.prior_variance_hypo_b = prior_variance_hypo_b
-        # logging.info(colored(f"Setting a Layer: {dnn_layer}", 'yellow'))
         
     # Set the prior for the linear layers
     dnn_linear_layer = get_linear_layers(dnn)
     bnn_linear_layer = get_linear_layers(bnn)
-    # print(colored(f"Number of Linear Layers: {len(dnn_linear_layer)}", 'red'))
-    # print(colored(f"Number of Linear Layers: {len(bnn_linear_layer)}", 'red'))
+
     for dnn_layer, bnn_layer in zip(dnn_linear_layer, bnn_linear_layer):
         
         mu = dnn_layer.weight.detach().cpu().clone()

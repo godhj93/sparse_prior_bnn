@@ -36,7 +36,8 @@ def main(args):
     if args.optimizer == 'sgd':
         optim = torch.optim.SGD(param_groups, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
     elif args.optimizer == 'adam':
-        optim = torch.optim.Adam(param_groups, lr=args.lr, weight_decay=args.weight_decay)
+        # optim = torch.optim.Adam(param_groups, lr=args.lr, weight_decay=args.weight_decay)
+        optim = torch.optim.AdamW(param_groups, lr=args.lr, weight_decay=args.weight_decay) 
     else:
         raise ValueError(f"Unsupported optimizer: {args.optimizer}")
     

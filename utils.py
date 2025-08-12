@@ -96,7 +96,7 @@ def get_model(args, logger):
             if args.data == 'tinyimagenet':
                 model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='nano')
             else:
-                model = vit_tiny_dnn(num_classes=num_classes, model='nano')
+                model = vit_tiny_dnn(num_classes=num_classes, img_size = 32,model='nano')
         elif args.model == 'mlp':
             pass
         else:
@@ -342,7 +342,7 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
             
         args.scheduler.step()
         
-        acc_test, nll, kl = test_BNN(model = model, test_loader = test_loader, bs = bs, mc_runs = mc_runs, device = device, args = args)
+        acc_test, nll, kl = test_BNN(model = model, test_loader = test_loader, bs = bs, mc_runs = 30, device = device, args = args)
         logger.info(f"[Test] Acc: {acc_test:.5f}, NLL: {nll:.5f}, KL: {kl:,}, KL scaling: {scaling}")
         
         # args.scheduler.step()

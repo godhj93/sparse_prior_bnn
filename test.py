@@ -588,41 +588,45 @@ def evaluate(model, best_model_weight, device, args, logger):
         print(colored("No OOD datasets specified. Skipping OOD evaluation.", 'red'))
 
     logger.info(colored("Adversarial attack evaluation starting...", 'blue'))
+    
     # Adversarial Attack Evaluation
-    from adversarialattack import fgsm_clf, pgd_clf, eval_clf
-    # FGSM
-    adv_data, adv_labels = [], []
-    for x,y in test_loader:
-        x_adv = fgsm_clf(model, x, y, args.eps, device=device)
-        adv_data.append(x_adv.cpu())
-        adv_labels.append(y.cpu())
-    
-    x_adv = torch.cat(adv_data, dim=0)
-    y_adv = torch.cat(adv_labels, dim=0)
-    adversarial_loader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
-    
-    fgsm_nll, fgsm_acc = eval_clf(model, adversarial_loader,
-                        mc_runs=args.mc_runs, device=device)
-    
-    # PGD
-    adv_data, adv_labels = [], []
-    for x,y in test_loader:
-        x_adv = pgd_clf(model, x, y, args.eps, device=device)
-        adv_data.append(x_adv.cpu())
-        adv_labels.append(y.cpu())
-    x_adv = torch.cat(adv_data, dim=0)
-    y_adv = torch.cat(adv_labels, dim=0)
-    adversarial_loader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
-    
-    pgd_nll, pgd_acc = eval_clf(model, adversarial_loader,
-                        mc_runs=args.mc_runs, device=device)
-    
-    experiment_results['adversarial_performance'] = {
-        'fgsm': {'nll': fgsm_nll, 'accuracy': fgsm_acc},
-        'pgd': {'nll': pgd_nll, 'accuracy': pgd_acc}
-    }
+    if args.type == 'uni':
+        from adversarialattack import fgsm_clf, pgd_clf, eval_clf
+        # FGSM
+        adv_data, adv_labels = [], []
+        for x,y in test_loader:
+            x_adv = fgsm_clf(model, x, y, args.eps, device=device)
+            adv_data.append(x_adv.cpu())
+            adv_labels.append(y.cpu())
+        
+        x_adv = torch.cat(adv_data, dim=0)
+        y_adv = torch.cat(adv_labels, dim=0)
+        adversarial_loader = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
+        
+        fgsm_nll, fgsm_acc = eval_clf(model, adversarial_loader,
+                            mc_runs=args.mc_runs, device=device)
+        
+        # PGD
+        adv_data, adv_labels = [], []
+        for x,y in test_loader:
+            x_adv = pgd_clf(model, x, y, args.eps, device=device)
+            adv_data.append(x_adv.cpu())
+            adv_labels.append(y.cpu())
+        x_adv = torch.cat(adv_data, dim=0)
+        y_adv = torch.cat(adv_labels, dim=0)
+        adversarial_loader = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(x_adv, y_adv), batch_size=128, shuffle=False)
+        
+        pgd_nll, pgd_acc = eval_clf(model, adversarial_loader,
+                            mc_runs=args.mc_runs, device=device)
+        
+        experiment_results['adversarial_performance'] = {
+            'fgsm': {'nll': fgsm_nll, 'accuracy': fgsm_acc},
+            'pgd': {'nll': pgd_nll, 'accuracy': pgd_acc}
+        }
+    else:
+        print(colored("Adversarial attack evaluation is only implemented for BNN models.", 'red'))
     # ──────────────────────────────────────────────
     # 최종 결과 파일 저장
     # ──────────────────────────────────────────────
