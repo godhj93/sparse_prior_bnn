@@ -47,7 +47,7 @@ def main(args):
         'model': args.model,
         'type': args.type,
         'data': args.data,
-        'moped': args.moped,
+        'moped': args.MOPED,
         'std': args.std,
         'scale': args.scale,
         'prior_type': args.prior_type,
@@ -55,7 +55,7 @@ def main(args):
 
     }
     
-    param_str = "_".join([f"{k}_{v}" for k, v in log_params.items()])
+    param_str = "_".join([f"{v}" for k, v in log_params.items()])
     log_path = f"runs/{log_params['data']}/{log_params['model']}/{log_params['date'][:8]}/{log_params['type']}/{param_str}"
     
     writer = SummaryWriter(log_dir=log_path, comment=param_str)
@@ -165,6 +165,7 @@ if __name__ == "__main__":
     parser.add_argument('--multi-gpu', action='store_true', help='Use multi-GPU')
     parser.add_argument('--weight', type=str, help='DNN weight path for initialization')
     parser.add_argument('--moped', action='store_true', help='DO NOT USE')
+    parser.add_argument('--MOPED', action='store_true', help='DO NOT USE')
     parser.add_argument('--ood', type=str, nargs='*', default=None, help='OOD datasets to evaluate')
     parser.add_argument('--clustering_method', type=str, default='umap', help='Clustering method for visualization [tsne, umap]'   )
     parser.add_argument('--perplexity', type=int, default=30)          # t‑SNE
@@ -173,6 +174,8 @@ if __name__ == "__main__":
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
 
     args = parser.parse_args()
+    
+    assert args.moped == False, "The --moped argument is deprecated and should not be used. Use --MOPED instead."
     print(colored(args, 'blue'))
 
     main(args)

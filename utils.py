@@ -391,6 +391,8 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
 
 def test_BNN(model, test_loader, bs, device, args, moped=False, mc_runs = 30):
     
+    assert mc_runs == 30, "MC runs should be set to 30 for testing BNN"
+    
     model.to(device)
     model.eval()
     

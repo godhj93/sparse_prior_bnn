@@ -475,7 +475,7 @@ def evaluate(model, best_model_weight, device, args, logger):
         experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll}
     
     elif args.type == 'uni':
-        acc, nll, kld = test_BNN(model=model, test_loader=test_loader, bs=args.bs, device=device, mc_runs=args.mc_runs, args=args)
+        acc, nll, kld = test_BNN(model=model, test_loader=test_loader, bs=args.bs, device=device, mc_runs=30, args=args)
         print(f"Dataset: {args.data}")
         print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}, KLD: {kld:.4f}", 'blue'))
         experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll, 'kld': kld}
@@ -649,6 +649,7 @@ def main(args):
     best_model_weight = torch.load(args.weight, map_location=device)
 
     evaluate(model, best_model_weight, device, args, logger)
+    
     '''
     model.load_state_dict(torch.load(args.weight))
     print(colored(f"Pretrained weight is loaded from {args.weight}", 'green'))
