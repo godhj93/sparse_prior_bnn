@@ -46,18 +46,36 @@ def process_json_file(file_path):
             "id_performance", 
             "ood_performance", 
             "clustering_performance", 
-            "adversarial_performance"
+            # "adversarial_performance" # 아래에서 별도로 처리
         ]
         
         for section in performance_sections:
             if section in data:
                 flat_section = flatten_dict(data[section], parent_key=section.replace('_performance',''))
                 result.update(flat_section)
+
+        # Adversarial performance 처리: id_performance와의 차이 계산
+        if "adversarial_performance" in data and "id_performance" in data:
+            id_perf = data["id_performance"]
+            adv_perf = data["adversarial_performance"]
+            
+            for attack_method, attack_results in adv_perf.items():
+                # acc와 nll에 대한 절대값 차이 계산
+                if "accuracy" in id_perf and "accuracy" in attack_results:
+                    result[f"adversarial_{attack_method}_acc_diff"] = abs(id_perf["accuracy"] - attack_results["accuracy"])
+                if "nll" in id_perf and "nll" in attack_results:
+                    result[f"adversarial_{attack_method}_nll_diff"] = abs(id_perf["nll"] - attack_results["nll"])
+                
+                # 다른 adversarial 지표가 있다면 그대로 추가
+                other_adv_metrics = {k: v for k, v in attack_results.items() if k not in ["accuracy", "nll"]}
+                if other_adv_metrics:
+                     flat_section = flatten_dict(other_adv_metrics, parent_key=f'adversarial_{attack_method}')
+                     result.update(flat_section)
         
         return result
 
     except (json.JSONDecodeError, FileNotFoundError) as e:
-        print(f"오류: {file_path} 처리 중 문제 발생 - {e}")
+        print(f"Error processing file {file_path}: {e}")
         return None
 
 def main(args, output_csv_file):

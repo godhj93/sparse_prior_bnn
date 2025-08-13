@@ -122,10 +122,10 @@ def plot_metrics(csv_path):
     
     # --- 세 번째 그림: 적대적 공격 Metric ---
     adversarial_metrics_to_plot = {
-        'FGSM NLL': 'adversarial_fgsm_nll',
-        'FGSM Accuracy': 'adversarial_fgsm_accuracy',
-        'PGD NLL': 'adversarial_pgd_nll',
-        'PGD Accuracy': 'adversarial_pgd_accuracy'
+        'FGSM NLL': 'adversarial_fgsm_nll_diff',
+        'FGSM Accuracy': 'adversarial_fgsm_acc_diff',
+        'PGD NLL': 'adversarial_pgd_acc_diff',
+        'PGD Accuracy': 'adversarial_pgd_nll_diff'
     }
 
     num_adversarial_metrics = len(adversarial_metrics_to_plot)
