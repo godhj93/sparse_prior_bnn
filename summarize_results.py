@@ -37,7 +37,7 @@ def process_json_file(file_path):
             "std": info.get("std"),
             "moped": info.get("MOPED"),
             "pruned_dnn_accuracy": info.get("pruned_dnn_acc"),
-            "pruned_dnn_nll": info.get("pruned_dnn_nll"),
+            "pruned_dnn_nll": info.get("pruned_dnn_loss"),
             "pruned_dnn_sparsity": info.get("pruned_dnn_sparsity"),
         }
         
