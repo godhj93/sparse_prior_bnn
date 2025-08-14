@@ -93,7 +93,12 @@ def main(args):
 
                 # Pruning step
                 prune_model(model, sparsity=i/100.0, logger=logger)
-                optim = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov = args.nesterov)
+                if args.optimizer == 'sgd':
+                    optim = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov = args.nesterov)
+                elif args.optimizer == 'adam':
+                    optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+                else:
+                    raise ValueError(f"Unsupported optimizer: {args.optimizer}")
                 args.scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[args.epochs//3, args.epochs//3*2], gamma=0.1)
                 
                 # Training

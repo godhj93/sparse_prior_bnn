@@ -39,6 +39,7 @@ def prune_model(model, sparsity, logger):
     parameters_to_prune = []
     for name, module in model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
+        # if isinstance(module, (nn.Conv2d)):
             parameters_to_prune.append((module, 'weight'))
     
     # global unstructured pruning을 적용합니다.
@@ -56,6 +57,7 @@ def prune_model(model, sparsity, logger):
             # 프루닝 후 각 모듈에는 'weight_mask' 버퍼가 생성됩니다.
             remaining_params = module.weight_mask.sum().item() if hasattr(module, 'weight_mask') else total_params
             pruned_percentage = 1 - (remaining_params / total_params)
+            print(f"{name}: {int(remaining_params)}/{int(total_params)} parameters remaining ({pruned_percentage:.2%} pruned)")
         else:
             pass
             
