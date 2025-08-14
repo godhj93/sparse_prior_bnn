@@ -181,6 +181,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     assert args.moped == False, "The --moped argument is deprecated and should not be used. Use --MOPED instead."
+    
+    if args.prune:
+        args.weight_decay = 0.0
+        print(colored("Pruning is enabled. Setting weight decay to 0.", 'red'))
+        
     print(colored(args, 'blue'))
 
     main(args)
