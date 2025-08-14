@@ -138,8 +138,11 @@ def extract_features(
         feats.append(inp[0].detach().cpu())
 
     # h = model[-1].register_forward_hook(_hook)
-
-    classifier = list(model.children())[-1]  # last layer
+    try:
+        classifier = model.base_model.head  # Should match the input features of the head
+    except:
+        classifier = list(model.children())[-1]  # last layer
+        
     h = classifier.register_forward_hook(_hook)
 
     total_iter = len(loader) * mc_runs
