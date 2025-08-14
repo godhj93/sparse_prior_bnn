@@ -474,20 +474,22 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
             acc_train = correct / total
             pbar.set_description(colored(f"[Train] Epoch: {e+1}/{epoch}, Acc: {acc_train:.3f}, NLL: {np.mean(nlls):.3f}, LR: {optimizer.param_groups[0]['lr']:.5f}", 'blue'))
 
-            writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], batch_idx + e * len(train_loader))
+            # writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], batch_idx + e * len(train_loader))
             
         args.scheduler.step()
-        
         acc_test, nll_test = test_DNN(model, test_loader, device, args)
         logger.info(f"[Test] Acc: {acc_test:.3f}, NLL: {nll_test:.3f}")
         
+
         if args.prune:
+            writer.add_scalar('Train/LearningRate', optimizer.param_groups[0]['lr'], e + 1 + args.total_epoch)
             writer.add_scalar('Train/accuracy', acc_train, e + 1 + args.total_epoch)
             writer.add_scalar('Train/loss/NLL', np.mean(nlls), e + 1 + args.total_epoch)
             writer.add_scalar('Test/accuracy', acc_test, e + 1 + args.total_epoch)
             writer.add_scalar('Test/loss/NLL', np.mean(nll_test), e + 1 + args.total_epoch)
 
         else:
+            writer.add_scalar('Train/LearningRate', optimizer.param_groups[0]['lr'], e)
             writer.add_scalar('Train/accuracy', acc_train, e)
             writer.add_scalar('Train/loss/NLL', np.mean(nlls), e)
             writer.add_scalar('Test/accuracy', acc_test, e)
