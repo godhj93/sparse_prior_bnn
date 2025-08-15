@@ -472,7 +472,7 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
             correct += (predicted == target).sum().item()
             total += target.size(0)
             acc_train = correct / total
-            pbar.set_description(colored(f"[Train] Epoch: {e+1}/{epoch}, Acc: {acc_train:.3f}, NLL: {np.mean(nlls):.3f}, LR: {optimizer.param_groups[0]['lr']:.5f}", 'blue'))
+            pbar.set_description(colored(f"[Train] Epoch: {e+1}/{epoch}, Acc: {acc_train:.3f}, NLL: {np.mean(nlls):.3f}, LR: {optimizer.param_groups[0]['lr']:.10f}", 'blue'))
 
             # writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], batch_idx + e * len(train_loader))
             

@@ -41,7 +41,8 @@ def main(args):
     else:
         raise ValueError(f"Unsupported optimizer: {args.optimizer}")
     
-    args.scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[args.epochs//3, args.epochs//3*2], gamma=0.1)
+    # args.scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[args.epochs//3, args.epochs//3*2], gamma=0.1)
+    args.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=args.epochs, eta_min=args.lr/100.0)
     
     log_params = {
         'model': args.model,
@@ -87,20 +88,33 @@ def main(args):
             logger.info(colored(f"Original model is saved at {save_path}", 'green'))
             
             args.total_epoch = 0
+
+            args.weight_decay = 0.0
+            logger.info(colored("Pruning is enabled. Setting weight decay to 0.", 'red'))
             for i in range(1, 100):
 
-                args.prune_iter = i
+                args.prune_iter = i*10
 
                 # Pruning step
-                prune_model(model, sparsity=i/100.0, logger=logger)
+                prune_model(model, sparsity=i*10/100.0, logger=logger)
+                # # Pruning 후에도 파라미터 그룹을 다시 정의하여 차등 학습률을 유지합니다.
+                # prior_params = [param for name, param in model.named_parameters() if 'log_a_q' in name or 'log_b_q' in name]
+                # base_params = [param for name, param in model.named_parameters() if not ('log_a_q' in name or 'log_b_q' in name)]
+
+                # param_groups = [
+                #     {'params': base_params},
+                #     {'params': prior_params, 'lr': args.lr_prior}
+                # ]
+
                 if args.optimizer == 'sgd':
                     optim = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov = args.nesterov)
                 elif args.optimizer == 'adam':
                     optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+                # -----------------------------------------------
                 else:
                     raise ValueError(f"Unsupported optimizer: {args.optimizer}")
-                args.scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[args.epochs//3, args.epochs//3*2], gamma=0.1)
                 
+                args.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=args.epochs, eta_min=args.lr/100.0)
                 # Training
                 if train_DNN(epoch=args.epochs, 
                         model=model, 
