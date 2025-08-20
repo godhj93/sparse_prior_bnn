@@ -95,6 +95,34 @@ class BaseVariationalLayer_(nn.Module):
                 
             return kl.mean()
 
+        elif prior_type == 'student-t':
+            # Student-t Prior (몬테카를로 근사)
+            
+            # 자유도(nu)는 하이퍼파라미터입니다. 값이 작을수록 꼬리가 두껍습니다.
+            nu = torch.tensor(1.0, device=mu_q.device)
+            
+            # 1. 재매개변수화 트릭을 이용한 샘플링 (S=1)
+            #    학습 중에는 배치 단위로 평균을 내므로 샘플은 1개로 충분합니다.
+            epsilon = torch.randn_like(mu_q)
+            w_sample = mu_q + sigma_q * epsilon
+            
+            # 2. 샘플에 대한 log q(w|D) 계산 (가우시안 PDF)
+            log_q = -torch.log(sigma_q) - 0.5 * torch.log(torch.tensor(2.0 * torch.pi, device=mu_q.device)) - \
+                    ((w_sample - mu_q)**2) / (2 * sigma_q**2)
+            
+            # 3. 샘플에 대한 log p(w) 계산 (Student-t PDF)
+            #    p(w)의 정규화 상수 계산 (로그 스케일)
+            log_p_norm_const = torch.lgamma((nu + 1) / 2) - torch.lgamma(nu / 2) - \
+                               0.5 * torch.log(nu * torch.pi)
+            
+            #    전체 log p(w) 계산
+            log_p = log_p_norm_const - ((nu + 1) / 2) * torch.log(1 + (w_sample**2) / nu)
+            
+            # 4. KL Divergence 근사: E_q[log q(w) - log p(w)]
+            kl = log_q - log_p
+            
+            return kl.mean()
+
         else:
             raise ValueError(f"Unknown prior_type: {prior_type}")
 

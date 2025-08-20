@@ -9,7 +9,7 @@ from bayesian_torch.layers.variational_layers.linear_variational import LinearRe
 __all__ = ['ViT_Tiny_uni', 'vit_tiny_uni']
 
 class ViT_Tiny_uni(nn.Module):
-    def __init__(self, num_classes=100, model = 'nano', prior_type=None):
+    def __init__(self, num_classes=100, model = 'nano', img_size = 32, prior_type=None):
         super().__init__()
         
         assert prior_type in ['normal', 'laplace'], "prior_type must be either 'normal' or 'laplace'"
@@ -28,7 +28,7 @@ class ViT_Tiny_uni(nn.Module):
         # load ViT backbone
         if model == 'original':
             self.base_model = VisionTransformer(
-                img_size=32,
+                img_size=img_size,
                 patch_size=4,
                 embed_dim=192 // 2,
                 depth=6 // 2,
@@ -38,7 +38,7 @@ class ViT_Tiny_uni(nn.Module):
             )
         elif model == 'nano':
             self.base_model = VisionTransformer(
-                img_size=32,
+                img_size=img_size,
                 patch_size=8,       # 큰 패치로 시퀀스 길이를 16으로 단축
                 embed_dim=96,       # 임베딩 차원을 낮게 설정
                 depth=4,            # 얕은 깊이
@@ -48,7 +48,7 @@ class ViT_Tiny_uni(nn.Module):
             )
         elif model == 'micro':
             self.base_model = VisionTransformer(
-                img_size=32,
+                img_size=img_size,
                 patch_size=4,       # 작은 패치로 더 많은 특징 학습 (시퀀스 길이 64)
                 embed_dim=192,      # 표준적인 경량 모델의 임베딩 차원
                 depth=6,            # 중간 수준의 깊이
@@ -58,7 +58,7 @@ class ViT_Tiny_uni(nn.Module):
             )
         elif model == 'pico':
             self.base_model = VisionTransformer(
-        img_size=32,
+        img_size=img_size,
         patch_size=4,
         embed_dim=256,      # 표현력을 위해 임베딩 차원 확장
         depth=7,            # 모델 깊이 추가
@@ -94,7 +94,7 @@ class ViT_Tiny_uni(nn.Module):
         kl = get_kl_loss(self.base_model)
         return out, kl
 
-def vit_tiny_uni(num_classes=100, model='nano', prior_type=None):
+def vit_tiny_uni(num_classes=100, model='nano', img_size=32, prior_type=None):
     """
     Create a ViT Tiny model with Bayesian conversion.
     
@@ -105,4 +105,4 @@ def vit_tiny_uni(num_classes=100, model='nano', prior_type=None):
     Returns:
         ViT_Tiny_uni: A ViT Tiny model with Bayesian layers.
     """
-    return ViT_Tiny_uni(num_classes=num_classes, model=model, prior_type = prior_type)
+    return ViT_Tiny_uni(num_classes=num_classes, model=model, img_size=img_size, prior_type=prior_type)
