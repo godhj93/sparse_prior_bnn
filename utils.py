@@ -111,7 +111,7 @@ def get_model(args, logger):
         elif args.model == 'densenet30':
             model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type)
         elif args.model == 'vit-tiny-layernorm-nano':
-            model = vit_tiny_uni(num_classes=num_classes, model='nano', prior_type=args.prior_type)
+            model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type)
         elif args.model == 'mlp':
             pass
         else:
@@ -196,6 +196,10 @@ def get_dataset(args, logger):
     elif args.data == 'tinyimagenet':
         
         img_size = 64
+        
+        if args.ood == 'tinyimagenet':
+            img_size = 32
+            
         logger.info(colored(f"Tiny ImageNet dataset is loaded", 'green'))
         
         transform_train = transforms.Compose([
