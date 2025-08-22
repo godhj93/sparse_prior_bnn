@@ -98,7 +98,7 @@ def get_model(args, logger):
             if args.data == 'tinyimagenet':
                 model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='nano')
             else:
-                model = vit_tiny_dnn(num_classes=num_classes, img_size = 32,model='nano')
+                model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='nano')
         elif args.model == 'mlp':
             pass
         else:
@@ -111,7 +111,10 @@ def get_model(args, logger):
         elif args.model == 'densenet30':
             model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type)
         elif args.model == 'vit-tiny-layernorm-nano':
-            model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type)
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type)
+            else:
+                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 32, prior_type=args.prior_type)
         elif args.model == 'mlp':
             pass
         else:
@@ -152,15 +155,21 @@ def get_dataset(args, logger):
     elif args.data == 'cifar10':
         
         logger.info(colored(f"CIFAR-10 dataset is loaded", 'green'))
+        img_size = 32
         
+        if 'cifar10' in args.ood: # Assume Model is trained for Tiny ImageNet (64x64)
+            img_size = 64
+        
+            
         transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
+            transforms.RandomCrop(img_size, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
         
         transform_test = transforms.Compose([
+            transforms.Resize(img_size),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
@@ -174,15 +183,20 @@ def get_dataset(args, logger):
     elif args.data == 'cifar100':
         
         logger.info(colored(f"CIFAR-100 dataset is loaded", 'green'))
+        img_size = 32
         
+        if 'cifar100' in args.ood:# Assume Model is trained for Tiny ImageNet (64x64)
+            img_size = 64
+            
         transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
+            transforms.RandomCrop(img_size, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
         ])
         
         transform_test = transforms.Compose([
+            transforms.Resize(img_size),
             transforms.ToTensor(),
             transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
         ])
@@ -197,10 +211,10 @@ def get_dataset(args, logger):
         
         img_size = 64
         
-        if args.ood == 'tinyimagenet':
+        if 'tinyimagenet' in args.ood:
             img_size = 32
             
-        logger.info(colored(f"Tiny ImageNet dataset is loaded", 'green'))
+        logger.info(colored(f"TinyImageNet dataset is loaded", 'green'))
         
         transform_train = transforms.Compose([
             transforms.RandomResizedCrop(img_size),

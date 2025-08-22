@@ -156,6 +156,7 @@ def main(args):
 
     # Let's test the model after training
     if best_model_weight is not None:
+        args.mc_runs = 30 # This is necessary for OOD evaluation "DO NOT REMOVE"
         evaluate(model, best_model_weight, device, args, logger)
     
     else:

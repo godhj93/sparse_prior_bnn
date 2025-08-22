@@ -457,6 +457,9 @@ def evaluate(model, best_model_weight, device, args, logger):
         'clustering_performance': {},
     }
 
+    # Add test date
+    experiment_results['info']['test_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     for key, value in vars(args).items():
         # Skip MultiStepLR and optimizer
         if key in ['scheduler', 'optimizer']:
@@ -576,7 +579,7 @@ def evaluate(model, best_model_weight, device, args, logger):
             args.data = ood
             print(f"Out of Distribution Dataset: {args.data}")
             _, out_data_loader = get_dataset(args, logger=logger)
-            
+
             if args.type == 'dnn':
                 experiment_results['ood_performance'][ood] = test_ood_detection_dnn(model, test_loader, out_data_loader, args=args)
 
@@ -753,7 +756,7 @@ if __name__ == '__main__':
     parser.add_argument('--mc_runs', type=int, default=30, help='Monte Carlo runs')
     parser.add_argument('--weight', type=str, help='Path to load weights')
     parser.add_argument('--ood', nargs='+', help='Out-of-distribution datasets')
-    parser.add_argument('--scale', type=str, default='N', help='KLD scale')
+    parser.add_argument('--scale', type=str, default='BS', help='KLD scale')
     parser.add_argument('--prior_type', type=str, help='Prior type [normal, laplace]')
     parser.add_argument('--multi-gpu', action='store_true', help='Use multi-GPU')
     parser.add_argument('--clustering_method', type=str, default='umap', help='Clustering method for visualization [tsne, umap]'   )
