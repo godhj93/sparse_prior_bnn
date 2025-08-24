@@ -44,7 +44,7 @@ def process_json_file(file_path):
         # 성능 지표 추출 및 평탄화
         performance_sections = [
             "id_performance", 
-            "ood_performance", 
+            # "ood_performance", # 아래에서 별도로 처리
             "clustering_performance", 
             # "adversarial_performance" # 아래에서 별도로 처리
         ]
@@ -52,6 +52,13 @@ def process_json_file(file_path):
         for section in performance_sections:
             if section in data:
                 flat_section = flatten_dict(data[section], parent_key=section.replace('_performance',''))
+                result.update(flat_section)
+
+        # OOD performance 동적 처리
+        if "ood_performance" in data:
+            ood_perf = data["ood_performance"]
+            for ood_dataset_name, ood_results in ood_perf.items():
+                flat_section = flatten_dict(ood_results, parent_key=f'ood_{ood_dataset_name}')
                 result.update(flat_section)
 
         # Adversarial performance 처리: id_performance와의 차이 계산

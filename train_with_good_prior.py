@@ -189,7 +189,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Train a Bayesian Neural Network')
     parser.add_argument('--epochs', type=int, default=90, help='Number of epochs to train')
-    parser.add_argument('--mc_runs', type=int, default=1, help='Number of Monte Carlo runs')
+    parser.add_argument('--mc_runs', type=int, default=30, help='Number of Monte Carlo runs')
     parser.add_argument('--lr', type=float, default=1e-1, help='Learning rate')
     parser.add_argument('--lr_prior', type=float, default=1e-3, help='Learning rate for prior parameters')
     parser.add_argument('--ig_a', type=float, default=1.0, help='Inverse Gamma a parameter')
@@ -221,6 +221,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_neighbors', type=int, default=15)         # UMAP
     parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
+    parser.add_argument('--save_results', default = True, action='store_true', help='Save experiment results to a JSON file')
+
     args = parser.parse_args()
     
     assert args.ood is not None, "Please provide OOD datasets to evaluate using --ood argument."

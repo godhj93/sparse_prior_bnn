@@ -232,6 +232,9 @@ def test_ood_detection_dnn(model, in_loader, out_loader, n_bins=15, args=None):
     }
 
 def test_ood_detection_bnn(model, in_loader, out_loader, mc_runs=30, n_bins=15, args=None):
+    
+    assert mc_runs == 30, "mc_runs must be 30 for OOD evaluation"
+    
     model.eval().cuda()
     
     results = {
@@ -443,6 +446,8 @@ def compute_mutual_information(mc_probabilities):
 
 def evaluate(model, best_model_weight, device, args, logger):
 
+    assert args.mc_runs == 30, "mc_runs must be 30 for evaluation"
+    
     model.load_state_dict(best_model_weight)
     model.eval()
     logger.info(colored(f"Pretrained model weights loaded", 'blue'))
@@ -478,7 +483,7 @@ def evaluate(model, best_model_weight, device, args, logger):
         experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll}
     
     elif args.type == 'uni':
-        acc, nll, kld = test_BNN(model=model, test_loader=test_loader, bs=args.bs, device=device, mc_runs=30, args=args)
+        acc, nll, kld = test_BNN(model=model, test_loader=test_loader, bs=args.bs, device=device, mc_runs=args.mc_runs, args=args)
         print(f"Dataset: {args.data}")
         print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}, KLD: {kld:.4f}", 'blue'))
         experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll, 'kld': kld}
@@ -630,13 +635,38 @@ def evaluate(model, best_model_weight, device, args, logger):
         }
     else:
         print(colored("Adversarial attack evaluation is only implemented for BNN models.", 'red'))
+    
+    # Summarize results
+    print("\n=== Summary of Results ===")
+    print("In-Distribution Performance:")
+    for metric, value in experiment_results['id_performance'].items():
+        print(f"  {metric}: {value:.4f}")
+    if experiment_results['ood_performance']:
+        print("\nOut-of-Distribution Performance:")
+        for ood, metrics in experiment_results['ood_performance'].items():
+            print(f"  OOD Dataset: {ood}")
+            for metric, value in metrics.items():
+                print(f"    {metric}: {value:.4f}")
+    if experiment_results.get('clustering_performance'):
+        print("\nClustering Performance:")
+        for metric, value in experiment_results['clustering_performance'].items():
+            print(f"  {metric}: {value:.4f}")
+    if experiment_results.get('adversarial_performance'):
+        print("\nAdversarial Performance:")
+        for attack, metrics in experiment_results['adversarial_performance'].items():
+            print(f"  Attack: {attack}")
+            for metric, value in metrics.items():
+                print(f"    {metric}: {value:.4f}")
+                
     # ──────────────────────────────────────────────
     # 최종 결과 파일 저장
     # ──────────────────────────────────────────────
-    save_path = args.weight.replace('.pth', '_results.json')
-    with open(save_path, 'w') as f:
-        json.dump(experiment_results, f, indent=4)
-    print(colored(f"\nAll experiment results saved to: {save_path}", 'magenta'))
+    
+    if args.save_results:
+        save_path = args.weight.replace('.pth', '_results2.json')
+        with open(save_path, 'w') as f:
+            json.dump(experiment_results, f, indent=4)
+        print(colored(f"\nAll experiment results saved to: {save_path}", 'magenta'))
 
 def main(args):
     
@@ -653,99 +683,6 @@ def main(args):
 
     evaluate(model, best_model_weight, device, args, logger)
     
-    '''
-    model.load_state_dict(torch.load(args.weight))
-    print(colored(f"Pretrained weight is loaded from {args.weight}", 'green'))
-    
-    # ------------------- 결과 저장을 위한 딕셔너리 초기화 -------------------
-    import os
-    import json
-    from datetime import datetime
-
-    experiment_results = {
-        'info': {
-            'weight_path': args.weight,
-            'test_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        },
-        'args': vars(args),
-        'id_performance': {},
-        'ood_performance': {}
-    }
-    # --------------------------------------------------------------------
-    
-    _, test_loader = get_dataset(args = args, logger = logger)
-    args.in_data = args.data
-    
-    if args.type == 'dnn':
-        # ──────────────────────────────────────────────
-        # ID Evaluation
-        # ──────────────────────────────────────────────
-
-        acc, nll = test_DNN(model, test_loader, device, args)
-        print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}", 'blue'))
-        experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll}
-
-        # ──────────────────────────────────────────────
-        # OOD Evaluation
-        # ──────────────────────────────────────────────
-        
-        for ood in args.ood:
-            
-            args.data = ood
-            
-            print(f"Out of Distribution Dataset: {args.data}")
-            _, out_data_loader = get_dataset(args, logger = logger)
-            experiment_results['ood_performance'][ood] = test_ood_detection_dnn(model, test_loader, out_data_loader, args = args)
-                  
-    elif args.type == 'uni':
-        
-        # ──────────────────────────────────────────────
-        # ID Evaluation
-        # ──────────────────────────────────────────────            
-        acc, nll, kld = test_BNN(model = model, test_loader = test_loader, bs = 128, device = device, mc_runs = args.mc_runs, args = args)
-        print(f"Dataset: {args.data}")
-        print(colored(f"Acc: {acc:.4f}, NLL: {nll:.4f}, KLD: {kld:.4f}", 'blue'))
-        experiment_results['id_performance'] = {'accuracy': acc, 'nll': nll, 'kld': kld}
-        
-        # print(colored("\n--- Checking Loss Flatness (Tr(C_theta)) ---", 'yellow'))
-        # tr_c = compute_tr_c_bnn(model, test_loader, device, args.mc_runs)
-        # print(colored(f"Tr(C_theta): {tr_c:.4f}\n", 'yellow'))
-        
-        # print(colored(f"\n--- Checking Loss Flatness (Tr(H_phi)) ---", 'green'))
-        # tr_h = compute_tr_h_bnn(model, test_loader, criterion=torch.nn.CrossEntropyLoss(), device=device, mc_runs=args.mc_runs)
-        # print(colored(f"Tr(H_phi): {tr_h:.4f}\n", 'green'))
-        
-        # experiment_results['flatness_metric'] = {'tr_c_theta': tr_c, 'tr_h_phi': tr_h}
-        
-        if args.ood is not None:
-            for ood in args.ood:
-                
-                args.data = ood
-                
-                print(f"Out of Distribution Dataset: {args.data}")
-                _, out_data_loader = get_dataset(args, logger = logger)
-                experiment_results['ood_performance'][ood] = test_ood_detection_bnn(model, test_loader, out_data_loader, mc_runs=args.mc_runs, args = args)
-
-    else:
-        
-        raise NotImplementedError("Not implemented yet")
-
-    # --------------------------- 최종 결과 파일 저장 ---------------------------
-    # 저장 경로: 가중치 파일명에서 확장자를 바꾸고 _results.json 추가
-    save_path = os.path.splitext(args.weight)[0] + '_results.json'
-    
-    # 가중치가 있는 디렉토리에 저장
-    save_dir = os.path.dirname(save_path)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    with open(save_path, 'w') as f:
-        json.dump(experiment_results, f, indent=4)
-        
-    print(colored(f"\nAll experiment results saved to: {save_path}", 'magenta'))
-    # ----------------------------------------------------------------------
-    '''
-
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Test a Pretrained Model')
@@ -764,7 +701,28 @@ if __name__ == '__main__':
     parser.add_argument('--n_neighbors', type=int, default=15)         # UMAP
     parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
+    parser.add_argument('--save_results', action='store_true', help='Save experiment results to a JSON file')
     args = parser.parse_args()
     
     print(colored(args, 'green'))
+    
+    # Load json config if exists
+    import os, json
+    if os.path.exists(args.weight.replace('.pth', '_results.json')):
+        with open(args.weight.replace('.pth', '_results.json'), 'r') as f:
+            saved_args = json.load(f)
+        for key, value in saved_args['info'].items():
+            if hasattr(args, key):
+                # Set MC runs as 30 for evaluation
+                
+                if key == 'mc_runs':
+                    value = 30
+                setattr(args, key, value)
+                
+            # if the argument does not exist in current args, add it
+            else:
+                setattr(args, key, value)
+        print(colored("Loaded args from config file:", 'yellow'))
+        print(colored(saved_args['info'], 'red'))
+
     main(args)
