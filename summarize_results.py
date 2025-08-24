@@ -93,7 +93,7 @@ def main(args, output_csv_file):
     # root_directory와 그 하위 모든 디렉토리를 탐색
     for dirpath, _, filenames in os.walk(args.search_root):
         for filename in filenames:
-            if filename == "best_nll_model_results.json":
+            if filename == "best_nll_model_results2.json":
                 file_path = os.path.join(dirpath, filename)
                 print(f"처리 중: {file_path}")
                 processed_data = process_json_file(file_path)
@@ -117,11 +117,11 @@ def main(args, output_csv_file):
     # 3. sparsity 값에 따라 오름차순으로 정렬
     df = df.sort_values(by=['moped', 'sparsity'], ascending=[False, True])
 
-
     # CSV 파일로 저장
     df.to_csv(output_csv_file, index=False, encoding='utf-8-sig')
     print(f"\n총 {len(all_results)}개의 결과를 '{output_csv_file}' 파일에 저장했습니다.")
 
+    return output_csv_file
 
 if __name__ == '__main__':
     # 검색을 시작할 상위 폴더 경로
@@ -134,4 +134,7 @@ if __name__ == '__main__':
     # 결과를 저장할 CSV 파일 이름
     output_csv = 'results_summary.csv'
     
-    main(args, output_csv)
+    output_csv_file = main(args, output_csv)
+    
+    from plot_results import plot_metrics
+    plot_metrics(output_csv_file)

@@ -30,21 +30,34 @@ def plot_metrics(csv_path):
     laplace_baseline = df[df['prior_type'] == 'laplace']
     normal_std1_baseline = df[(df['prior_type'] == 'normal') & (df['std'] == 1.0)]
 
-    # --- 그릴 Metric 정의 ---
-    # 2x4 그리드로 변경
+    # --- 그릴 Metric 정의 (OOD는 동적으로 추가) ---
     metrics_to_plot = {
         # 1행
         'Accuracy': 'id_accuracy',
         'ID NLL': 'id_nll',
         'Pruned DNN vs BNN Acc': ('pruned_dnn_accuracy', 'id_accuracy'),
         'Pruned DNN vs BNN NLL': ('pruned_dnn_nll', 'id_nll'),
-        # 2행
-        'ECE': 'ood_tinyimagenet_ece',
-        'AUROC (MSP)': 'ood_tinyimagenet_auroc_msp',
-        'AUROC (Entropy)': 'ood_tinyimagenet_auroc_entropy',
-        'AUROC (MI)': 'ood_tinyimagenet_auroc_mi'
     }
+
+    # OOD 데이터셋 이름 동적 감지
+    ood_dataset_name = None
+    for col in df.columns:
+        if col.startswith('ood_') and col.endswith('_ece'):
+            # 'ood_cifar100_ece' -> 'cifar100'
+            ood_dataset_name = col.replace('ood_', '').replace('_ece', '')
+            break
     
+    # OOD 관련 Metric 추가
+    if ood_dataset_name:
+        print(f"Detected OOD dataset: {ood_dataset_name}")
+        metrics_to_plot.update({
+            f'ECE ({ood_dataset_name})': f'ood_{ood_dataset_name}_ece',
+            f'AUROC MSP ({ood_dataset_name})': f'ood_{ood_dataset_name}_auroc_msp',
+            f'AUROC Entropy ({ood_dataset_name})': f'ood_{ood_dataset_name}_auroc_entropy',
+            f'AUROC MI ({ood_dataset_name})': f'ood_{ood_dataset_name}_auroc_mi'
+        })
+
+    # 2x4 그리드로 변경
     num_rows = 2
     num_cols = 4
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
