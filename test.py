@@ -546,7 +546,8 @@ def evaluate(model, best_model_weight, device, args, logger):
 
         loader = DataLoader(Subset(dataset, sel_idx), batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
 
-        feats, lbls = extract_features(model, loader, args.mc_runs, device)
+        # feats, lbls = extract_features(model, loader, args.mc_runs, device)
+        feats, lbls = extract_features(model, loader, 5, device)
 
         #* [N, D] features and [N] labels
 
@@ -557,7 +558,15 @@ def evaluate(model, best_model_weight, device, args, logger):
                 n_neighbors=args.n_neighbors,
                 min_dist=args.min_dist,
             )
-
+        
+        # Save feats, lbls, Y, kl 
+        
+        torch.save({
+            'feats': feats,
+            'lbls': lbls,
+            'Y': Y,
+            'kl': kl,
+        }, args.weight.replace('.pth', '_clustering.pth'))
         sil, db, pr, gv = cluster_metrics(Y, lbls.numpy())
         rho = global_rank_corr(feats.numpy(), Y)
 
