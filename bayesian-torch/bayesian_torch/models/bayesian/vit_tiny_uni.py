@@ -12,7 +12,7 @@ class ViT_Tiny_uni(nn.Module):
     def __init__(self, num_classes=100, model = 'nano', img_size = 32, prior_type=None):
         super().__init__()
         
-        assert prior_type in ['normal', 'laplace'], "prior_type must be either 'normal' or 'laplace'"
+        assert prior_type in ['normal', 'laplace', 'student-t', 'spike-and-slab'], "prior_type must be either 'normal', 'laplace', 'student-t', or 'spike-and-slab'"
         const_bnn_prior_parameters = {
             'prior_mu': 0.0,
             'prior_sigma': 1.0,

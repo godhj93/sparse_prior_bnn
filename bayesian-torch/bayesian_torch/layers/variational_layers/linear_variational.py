@@ -60,6 +60,7 @@ class LinearReparameterization(BaseVariationalLayer_):
                  prior_type=None,
                  posterior_mu_init=0,
                  posterior_rho_init=-3.0,
+                 spike_and_slab_pi=0.5, # Spike-and-Slab prior
                  bias=True):
         """
         Implements Linear layer with reparameterization trick.
@@ -75,8 +76,9 @@ class LinearReparameterization(BaseVariationalLayer_):
             posterior_rho_init: float -> init trainable rho parameter representing the sigma of the approximate posterior through softplus function,
             bias: bool -> if set to False, the layer will not learn an additive bias. Default: True,
         """
-        super(LinearReparameterization, self).__init__()
+        super(LinearReparameterization, self).__init__(spike_and_slab_pi=spike_and_slab_pi)
         assert prior_type is not None, "prior_type must be specified for LinearReparameterization layer"
+        assert prior_type in ['normal', 'laplace', 'student-t', 'spike-and-slab', 'horseshoe'], "prior_type must be one of ['normal', 'laplace', 'student-t', 'spike-and-slab', 'horseshoe']"
 
         self.in_features = in_features
         self.out_features = out_features
@@ -90,6 +92,16 @@ class LinearReparameterization(BaseVariationalLayer_):
 
         self.mu_weight = Parameter(torch.Tensor(out_features, in_features))
         self.rho_weight = Parameter(torch.Tensor(out_features, in_features))
+        if prior_type == 'spike-and-slab':
+            self.spike_and_slab_pi = spike_and_slab_pi
+            self.log_alpha_weight = Parameter(torch.Tensor(out_features, in_features)) # Spike-and-Slab prior
+        elif prior_type == 'horseshoe':
+            self.l_loc_weight = Parameter(torch.Tensor(out_features, in_features))
+            self.l_scale_weight = Parameter(torch.Tensor(out_features, in_features))
+            self.t_loc_weight = Parameter(torch.Tensor(1))
+            self.t_scale_weight = Parameter(torch.Tensor(1))
+            
+            
         self.register_buffer('eps_weight',
                              torch.Tensor(out_features, in_features),
                              persistent=False)
@@ -102,6 +114,14 @@ class LinearReparameterization(BaseVariationalLayer_):
         if bias:
             self.mu_bias = Parameter(torch.Tensor(out_features))
             self.rho_bias = Parameter(torch.Tensor(out_features))
+            if prior_type == 'spike-and-slab':
+                self.log_alpha_bias = Parameter(torch.Tensor(out_features)) # Spike-and-Slab prior
+            elif prior_type == 'horseshoe':
+                self.l_loc_bias = Parameter(torch.Tensor(out_features))
+                self.l_scale_bias = Parameter(torch.Tensor(out_features))
+                self.t_loc_bias = Parameter(torch.Tensor(1))
+                self.t_scale_bias = Parameter(torch.Tensor(1))
+                
             self.register_buffer(
                 'eps_bias',
                 torch.Tensor(out_features),
@@ -114,6 +134,14 @@ class LinearReparameterization(BaseVariationalLayer_):
                                  torch.Tensor(out_features),
                                  persistent=False)
         else:
+            if prior_type == 'spike-and-slab':
+                self.register_parameter('log_alpha_bias', None) # Spike-and-Slab prior
+            elif prior_type == 'horseshoe':
+                self.register_parameter('l_loc_bias', None)
+                self.register_parameter('l_scale_bias', None)
+                self.register_parameter('t_loc_bias', None)
+                self.register_parameter('t_scale_bias', None)
+                
             self.register_buffer('prior_bias_mu', None, persistent=False)
             self.register_buffer('prior_bias_sigma', None, persistent=False)
             self.register_parameter('mu_bias', None)
@@ -134,10 +162,26 @@ class LinearReparameterization(BaseVariationalLayer_):
     def init_parameters(self):
         self.prior_weight_mu.fill_(self.prior_mean)
         self.prior_weight_sigma.fill_(self.prior_variance)
-
+        if self.prior_type == 'spike-and-slab':
+            self.log_alpha_weight.data.normal_(mean=-3.0, std=0.1)  # Spike-and-Slab prior
+        elif self.prior_type == 'horseshoe':
+            # LogNormal 분포의 파라미터 초기화 (작은 양수 값에서 시작하도록)
+            self.l_loc_weight.data.normal_(mean=-3.0, std=0.1)
+            self.l_scale_weight.data.normal_(mean=-3.0, std=0.1)
+            self.t_loc_weight.data.normal_(mean=-3.0, std=0.1)
+            self.t_scale_weight.data.normal_(mean=-3.0, std=0.1)
+            
         self.mu_weight.data.normal_(mean=self.posterior_mu_init[0], std=0.1)
         self.rho_weight.data.normal_(mean=self.posterior_rho_init[0], std=0.1)
         if self.mu_bias is not None:
+            if self.prior_type == 'spike-and-slab':
+                self.log_alpha_bias.data.normal_(mean=-3.0, std=0.1) # Spike-and-Slab prior
+            elif self.prior_type == 'horseshoe':
+                self.l_loc_bias.data.normal_(mean=-3.0, std=0.1)
+                self.l_scale_bias.data.normal_(mean=-3.0, std=0.1)
+                self.t_loc_bias.data.normal_(mean=-3.0, std=0.1)
+                self.t_scale_bias.data.normal_(mean=-3.0, std=0.1)
+                
             self.prior_bias_mu.fill_(self.prior_mean)
             self.prior_bias_sigma.fill_(self.prior_variance)
             self.mu_bias.data.normal_(mean=self.posterior_mu_init[0], std=0.1)
@@ -146,16 +190,57 @@ class LinearReparameterization(BaseVariationalLayer_):
 
     def kl_loss(self):
         sigma_weight = torch.log1p(torch.exp(self.rho_weight))
-        kl = self.kl_div(
-            self.mu_weight,
-            sigma_weight,
-            self.prior_weight_mu,
-            self.prior_weight_sigma,
-            prior_type=self.prior_type)
-        if self.mu_bias is not None:
-            sigma_bias = torch.log1p(torch.exp(self.rho_bias))
-            kl += self.kl_div(self.mu_bias, sigma_bias,
-                              self.prior_bias_mu, self.prior_bias_sigma, prior_type=self.prior_type)
+        
+        if self.prior_type == 'horseshoe':
+            kl = self.kl_div_horseshoe(
+                mu_q = self.mu_weight,
+                sigma_q = sigma_weight,
+                l_loc = self.l_loc_weight,
+                l_scale = self.l_scale_weight,
+                t_loc = self.t_loc_weight,
+                t_scale = self.t_scale_weight
+            )
+            if self.mu_bias is not None:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div_horseshoe(
+                    mu_q = self.mu_bias,
+                    sigma_q = sigma_bias,
+                    l_loc = self.l_loc_bias,
+                    l_scale = self.l_scale_bias,
+                    t_loc = self.t_loc_bias,
+                    t_scale = self.t_scale_bias
+                )
+                
+        elif self.prior_type == 'spike-and-slab':
+            kl = self.kl_div_spike_and_slab(
+                mu_q = self.mu_weight,
+                sigma_q = sigma_weight,
+                log_alpha = self.log_alpha_weight,
+                mu_p = self.prior_weight_mu,
+                sigma_p = self.prior_weight_sigma,
+                pi_p = self.spike_and_slab_pi
+            )
+            if self.mu_bias is not None:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div_spike_and_slab(
+                    mu_q = self.mu_bias,
+                    sigma_q = sigma_bias,
+                    log_alpha = self.log_alpha_bias,
+                    mu_p = self.prior_bias_mu,
+                    sigma_p = self.prior_bias_sigma,
+                    pi_p = self.spike_and_slab_pi
+                )
+        else:
+            kl = self.kl_div(
+                self.mu_weight,
+                sigma_weight,
+                self.prior_weight_mu,
+                self.prior_weight_sigma,
+                prior_type=self.prior_type)
+            if self.mu_bias is not None:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div(self.mu_bias, sigma_bias,
+                                self.prior_bias_mu, self.prior_bias_sigma, prior_type=self.prior_type)
         return kl
 
     def forward(self, input, return_kl=True):
@@ -168,7 +253,28 @@ class LinearReparameterization(BaseVariationalLayer_):
 
 
         if return_kl:
-            kl_weight = self.kl_div(self.mu_weight, sigma_weight,
+            
+            if self.prior_type == 'horseshoe':
+                kl_weight = self.kl_div_horseshoe(
+                    mu_q = self.mu_weight,
+                    sigma_q = sigma_weight,
+                    l_loc = self.l_loc_weight,
+                    l_scale = self.l_scale_weight,
+                    t_loc = self.t_loc_weight,
+                    t_scale = self.t_scale_weight
+                )
+                
+            elif self.prior_type == 'spike-and-slab':
+                kl_weight = self.kl_div_spike_and_slab(
+                    mu_q = self.mu_weight,
+                    sigma_q = sigma_weight,
+                    log_alpha = self.log_alpha_weight,
+                    mu_p = self.prior_weight_mu,
+                    sigma_p = self.prior_weight_sigma,
+                    pi_p = self.spike_and_slab_pi
+                )
+            else:
+                kl_weight = self.kl_div(self.mu_weight, sigma_weight,
                                     self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
         bias = None
 
@@ -176,7 +282,27 @@ class LinearReparameterization(BaseVariationalLayer_):
             sigma_bias = torch.log1p(torch.exp(self.rho_bias))
             bias = self.mu_bias + (sigma_bias * self.eps_bias.data.normal_())
             if return_kl:
-                kl_bias = self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu,
+                if self.prior_type == 'horseshoe':
+                    kl_bias = self.kl_div_horseshoe(
+                        mu_q = self.mu_bias,
+                        sigma_q = sigma_bias,
+                        l_loc = self.l_loc_bias,
+                        l_scale = self.l_scale_bias,
+                        t_loc = self.t_loc_bias,
+                        t_scale = self.t_scale_bias
+                    )
+                    
+                elif self.prior_type == 'spike-and-slab':
+                    kl_bias = self.kl_div_spike_and_slab(
+                        mu_q = self.mu_bias,
+                        sigma_q = sigma_bias,
+                        log_alpha = self.log_alpha_bias,
+                        mu_p = self.prior_bias_mu,
+                        sigma_p = self.prior_bias_sigma,
+                        pi_p = self.spike_and_slab_pi
+                    )
+                else:
+                    kl_bias = self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu,
                                       self.prior_bias_sigma, prior_type = self.prior_type)
 
         out = F.linear(input, weight, bias)

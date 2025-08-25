@@ -241,6 +241,7 @@ class Conv2dReparameterization(BaseVariationalLayer_):
                  prior_type=None,
                  posterior_mu_init=0,
                  posterior_rho_init=-3.0,
+                 spike_and_slab_pi=0.5, 
                  bias=True):
         """
         Implements Conv2d layer with reparameterization trick.
@@ -262,13 +263,15 @@ class Conv2dReparameterization(BaseVariationalLayer_):
             bias: bool -> if set to False, the layer will not learn an additive bias. Default: True,
         """
 
-        super(Conv2dReparameterization, self).__init__()
+        super(Conv2dReparameterization, self).__init__(spike_and_slab_pi=spike_and_slab_pi)
         if in_channels % groups != 0:
             raise ValueError('invalid in_channels size')
         if out_channels % groups != 0:
             raise ValueError('invalid in_channels size')
 
-        assert prior_type is not None, "prior_type must be specified for Conv2dReparameterization layer"
+        assert prior_type is not None, "prior_type must be specified"
+        assert prior_type in ['normal', 'laplace', 'student-t', 'spike-and-slab', 'horseshoe'], "prior_type must be one of ['normal', 'laplace', 'spike-and-slab', 'horseshoe']"
+        
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -283,9 +286,27 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         # variance of weight --> sigma = log (1 + exp(rho))
         self.posterior_rho_init = posterior_rho_init,
         self.bias = bias
-
+        
+        
         kernel_size = get_kernel_size(kernel_size, 2)
 
+        if prior_type == 'spike-and-slab':
+            ## Spike-and-Slab prior
+            self.spike_and_slab_pi = spike_and_slab_pi
+            self.log_alpha = Parameter(
+                torch.Tensor(out_channels, in_channels // groups, kernel_size[0],
+                            kernel_size[1]))
+            ## End Spike-and-Slab prior
+            
+        elif prior_type == 'horseshoe':
+            # 커널 가중치의 지역(local) 파라미터 lambda_ij
+            self.l_loc_kernel = Parameter(torch.Tensor(out_channels, in_channels // groups, *kernel_size))
+            self.l_scale_kernel = Parameter(torch.Tensor(out_channels, in_channels // groups, *kernel_size))
+            # 커널 가중치의 전역(global) 파라미터 tau (레이어당 하나)
+            self.t_loc_kernel = Parameter(torch.Tensor(1))
+            self.t_scale_kernel = Parameter(torch.Tensor(1))
+        
+        
         self.mu_kernel = Parameter(
             torch.Tensor(out_channels, in_channels // groups, kernel_size[0],
                          kernel_size[1]))
@@ -311,6 +332,14 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         if self.bias:
             self.mu_bias = Parameter(torch.Tensor(out_channels))
             self.rho_bias = Parameter(torch.Tensor(out_channels))
+            if prior_type == 'spike-and-slab':
+                self.log_alpha_bias = Parameter(torch.Tensor(out_channels)) # Spike-and-Slab prior
+            elif prior_type == 'horseshoe':
+                self.l_loc_bias = Parameter(torch.Tensor(out_channels))
+                self.l_scale_bias = Parameter(torch.Tensor(out_channels))
+                self.t_loc_bias = Parameter(torch.Tensor(1))
+                self.t_scale_bias = Parameter(torch.Tensor(1))
+                
             self.register_buffer('eps_bias', torch.Tensor(out_channels), persistent=False)
             self.register_buffer('prior_bias_mu', torch.Tensor(out_channels), persistent=False)
             self.register_buffer('prior_bias_sigma',
@@ -319,6 +348,14 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         else:
             self.register_parameter('mu_bias', None)
             self.register_parameter('rho_bias', None)
+            if prior_type == 'spike-and-slab':
+                self.register_parameter('log_alpha_bias', None) # Spike-and-Slab prior
+            elif prior_type == 'horseshoe':
+                self.register_parameter('l_loc_bias', None)
+                self.register_parameter('l_scale_bias', None)
+                self.register_parameter('t_loc_bias', None)
+                self.register_parameter('t_scale_bias', None)
+                
             self.register_buffer('eps_bias', None, persistent=False)
             self.register_buffer('prior_bias_mu', None, persistent=False)
             self.register_buffer('prior_bias_sigma', None, persistent=False)
@@ -340,20 +377,59 @@ class Conv2dReparameterization(BaseVariationalLayer_):
 
         self.mu_kernel.data.normal_(mean=self.posterior_mu_init[0], std=0.1)
         self.rho_kernel.data.normal_(mean=self.posterior_rho_init[0], std=0.1)
+        if self.prior_type == 'spike-and-slab':
+            self.log_alpha.data.normal_(mean=-3.0, std=0.1)  # Spike-and-Slab prior
+        elif self.prior_type == 'horseshoe':
+            # LogNormal 분포의 파라미터 초기화 (작은 양수 값에서 시작하도록)
+            self.l_loc_kernel.data.normal_(mean=-3.0, std=0.1)
+            self.l_scale_kernel.data.normal_(mean=-3.0, std=0.1)
+            self.t_loc_kernel.data.normal_(mean=-3.0, std=0.1)
+            self.t_scale_kernel.data.normal_(mean=-3.0, std=0.1)
+            
         if self.bias:
             self.prior_bias_mu.fill_(self.prior_mean)
             self.prior_bias_sigma.fill_(self.prior_variance)
-
+            if self.prior_type == 'spike-and-slab':
+                self.log_alpha_bias.data.normal_(mean=-3.0, std=0.1) # Spike-and-Slab prior
+            elif self.prior_type == 'horseshoe':
+                self.l_loc_bias.data.normal_(mean=-3.0, std=0.1)
+                self.l_scale_bias.data.normal_(mean=-3.0, std=0.1)
+                self.t_loc_bias.data.normal_(mean=-3.0, std=0.1)
+                self.t_scale_bias.data.normal_(mean=-3.0, std=0.1)
+                
             self.mu_bias.data.normal_(mean=self.posterior_mu_init[0], std=0.1)
             self.rho_bias.data.normal_(mean=self.posterior_rho_init[0],
                                        std=0.1)
 
     def kl_loss(self):
         sigma_weight = torch.log1p(torch.exp(self.rho_kernel))
-        kl = self.kl_div(self.mu_kernel, sigma_weight, self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
-        if self.bias:
-            sigma_bias = torch.log1p(torch.exp(self.rho_bias))
-            kl += self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu, self.prior_bias_sigma, prior_type = self.prior_type)
+        
+        if self.prior_type == 'horseshoe':
+            kl = self.kl_div_horseshoe(
+                mu_q = self.mu_kernel,
+                sigma_q = sigma_weight,
+                l_loc = self.l_loc_kernel,
+                l_scale= self.l_scale_kernel,
+                t_loc = self.t_loc_kernel,
+                t_scale = self.t_scale_kernel
+            )
+            
+            if self.bias:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div_horseshoe(
+                    mu_q = self.mu_bias,
+                    sigma_q = sigma_bias,
+                    l_loc = self.l_loc_bias,
+                    l_scale= self.l_scale_bias,
+                    t_loc = self.t_loc_bias,
+                    t_scale = self.t_scale_bias
+                )
+        else:
+            kl = self.kl_div(
+                self.mu_kernel, sigma_weight, self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
+            if self.bias:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu, self.prior_bias_sigma, prior_type = self.prior_type)
 
         return kl
 
@@ -367,7 +443,27 @@ class Conv2dReparameterization(BaseVariationalLayer_):
         weight = self.mu_kernel + tmp_result
 
         if return_kl:
-            kl_weight = self.kl_div(self.mu_kernel, sigma_weight,
+            
+            if self.prior_type == 'horseshoe':
+                kl_weight = self.kl_div_horseshoe(
+                    mu_q = self.mu_kernel,
+                    sigma_q = sigma_weight,
+                    l_loc = self.l_loc_kernel,
+                    l_scale= self.l_scale_kernel,
+                    t_loc = self.t_loc_kernel,
+                    t_scale = self.t_scale_kernel
+                )
+            elif self.prior_type == 'spike-and-slab':
+                kl_weight = self.kl_div_spike_and_slab(
+                    mu_q = self.mu_kernel,
+                    sigma_q = sigma_weight,
+                    log_alpha = self.log_alpha,
+                    mu_p = self.prior_weight_mu,
+                    sigma_p = self.prior_weight_sigma,
+                    pi_p = self.spike_and_slab_pi
+                )
+            else:
+                kl_weight = self.kl_div(self.mu_kernel, sigma_weight,
                                     self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)
         bias = None
 
@@ -376,7 +472,27 @@ class Conv2dReparameterization(BaseVariationalLayer_):
             eps_bias = self.eps_bias.data.normal_()
             bias = self.mu_bias + (sigma_bias * eps_bias)
             if return_kl:
-                kl_bias = self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu,
+                if self.prior_type == 'horseshoe':
+                    kl_bias = self.kl_div_horseshoe(
+                        mu_q = self.mu_bias,
+                        sigma_q = sigma_bias,
+                        l_loc = self.l_loc_bias,
+                        l_scale= self.l_scale_bias,
+                        t_loc = self.t_loc_bias,
+                        t_scale = self.t_scale_bias
+                    )
+                
+                elif self.prior_type == 'spike-and-slab':
+                    kl_bias = self.kl_div_spike_and_slab(
+                        mu_q = self.mu_bias,
+                        sigma_q = sigma_bias,
+                        log_alpha = self.log_alpha_bias,
+                        mu_p = self.prior_bias_mu,
+                        sigma_p = self.prior_bias_sigma,
+                        pi_p = self.spike_and_slab_pi
+                    )
+                else:
+                    kl_bias = self.kl_div(self.mu_bias, sigma_bias, self.prior_bias_mu,
                                       self.prior_bias_sigma, prior_type = self.prior_type)
 
         out = F.conv2d(input, weight, bias, self.stride, self.padding,
