@@ -129,7 +129,7 @@ class BaseVariationalLayer_(nn.Module):
         #     return kl.mean()
         elif prior_type == 'student-t':
             L=10
-            print("Using Monte Carlo with L=10 samples for Student-t KL Divergence")
+            # print("Using Monte Carlo with L=10 samples for Student-t KL Divergence")
             nu = torch.tensor(1.0, device=mu_q.device)
     
             # 1. L개의 샘플을 담을 수 있도록 텐서 차원 확장

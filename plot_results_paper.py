@@ -114,6 +114,63 @@ def plot_metrics(csv_path):
     print(f"Plot saved to {output_filename}")
     # plt.show() # 로컬에서 바로 확인하고 싶을 경우 주석 해제
 
+    #! --- [NEW] 논문용 그림 (1x4, 제목 없음) ---
+    paper_metrics_to_plot = {
+        'Accuracy': 'id_accuracy',
+        'NLL': 'id_nll',
+    }
+    if ood_dataset_name:
+        paper_metrics_to_plot.update({
+            'ECE': f'ood_{ood_dataset_name}_ece',
+            'AUROC (MSP)': f'ood_{ood_dataset_name}_auroc_msp'
+        })
+
+    num_paper_metrics = len(paper_metrics_to_plot)
+    fig_paper, axes_paper = plt.subplots(1, num_paper_metrics, figsize=(5 * num_paper_metrics, 4))
+    
+    # fig_paper.suptitle('Model Performance vs. Sparsity for Paper', fontsize=16) # Main title if needed
+
+    for i, (ylabel, col_name) in enumerate(paper_metrics_to_plot.items()):
+        ax = axes_paper[i]
+
+        # 1. 메인 라인 플롯
+        ax.plot(main_df['sparsity'], main_df[col_name], marker='o', linestyle='-', label='Ours (std=0.001)')
+
+        # 2. 기준선(Baseline) 플롯
+        if not moped_baseline.empty:
+            ax.axhline(y=moped_baseline[col_name].iloc[0], color='r', linestyle='--', label=f'MOPED (val={moped_baseline[col_name].iloc[0]:.3f})')
+        if not laplace_baseline.empty:
+            ax.axhline(y=laplace_baseline[col_name].iloc[0], color='g', linestyle='--', label=f'Laplace (val={laplace_baseline[col_name].iloc[0]:.3f})')
+        if not normal_std1_baseline.empty:
+            ax.axhline(y=normal_std1_baseline[col_name].iloc[0], color='m', linestyle='--', label=f'Normal std=1.0 (val={normal_std1_baseline[col_name].iloc[0]:.3f})')
+        if not student_t_baseline.empty:
+            ax.axhline(y=student_t_baseline[col_name].iloc[0], color='c', linestyle='--', label=f'Student-t (val={student_t_baseline[col_name].iloc[0]:.3f})')
+        if not spike_and_slab_baseline.empty:
+            ax.axhline(y=spike_and_slab_baseline[col_name].iloc[0], color='y', linestyle='--', label=f'Spike-and-Slab (val={spike_and_slab_baseline[col_name].iloc[0]:.3f})')
+            
+        ax.set_xlabel('Sparsity')
+        ax.set_ylabel(ylabel)
+    
+        if ylabel == 'NLL':
+            title = 'Negative Log-Likelihood'
+        elif ylabel == 'ECE':
+            title = 'Expected Calibration Error'
+        elif ylabel == 'AUROC (MSP)':
+            title = 'AUROC (Max Softmax Probability)'
+        elif ylabel == 'Accuracy':
+            title = 'Accuracy'
+        else:
+            raise ValueError(f"Unexpected ylabel: {ylabel}")
+        ax.set_title(title) # As requested, title is removed.
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.legend()
+
+    plt.tight_layout() # rect=[0, 0.03, 1, 0.95]
+    paper_output_filename = os.path.join(output_dir, 'results_plot_paper.png')
+    plt.savefig(paper_output_filename, dpi=1200)
+    print(f"Paper plot saved to {paper_output_filename}")
+    
+    
     #! --- 두 번째 그림: 클러스터링 Metric ---
     clustering_metrics_to_plot = {
         'Silhouette': 'clustering_silhouette',
@@ -194,7 +251,7 @@ def plot_metrics(csv_path):
             
         ax.set_xlabel('Sparsity')
         ax.set_ylabel(title)
-        # ax.set_title(title)
+        ax.set_title(title)
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax.legend()
 

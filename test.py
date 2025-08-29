@@ -726,6 +726,10 @@ if __name__ == '__main__':
                 
                 if key == 'mc_runs':
                     value = 30
+                    
+                elif key == 'weight':
+                    value = args.weight
+                
                 setattr(args, key, value)
                 
             # if the argument does not exist in current args, add it

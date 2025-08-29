@@ -136,5 +136,5 @@ if __name__ == '__main__':
     
     output_csv_file = main(args, output_csv)
     
-    from plot_results import plot_metrics
+    from plot_results_paper import plot_metrics
     plot_metrics(output_csv_file)
