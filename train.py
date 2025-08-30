@@ -3,7 +3,7 @@ import argparse
 import logging
 import datetime
 from tqdm import tqdm
-from utils import get_model, get_dataset, train_DNN, train_BNN, test_DNN, prune_model
+from utils import get_model, get_dataset, train_DNN, train_BNN, test_DNN, prune_model, prune_dnn_ffn_only
 from termcolor import colored
 from torch.utils.tensorboard import SummaryWriter
 import os
@@ -96,7 +96,10 @@ def main(args):
                 args.prune_iter = i*10
 
                 # Pruning step
-                prune_model(model, sparsity=i*10/100.0, logger=logger)
+                if 'vit' in args.model:
+                    prune_dnn_ffn_only(model, sparsity=i*10/100.0, logger=logger)
+                else:
+                    prune_model(model, sparsity=i*10/100.0, logger=logger)
                 # # Pruning 후에도 파라미터 그룹을 다시 정의하여 차등 학습률을 유지합니다.
                 # prior_params = [param for name, param in model.named_parameters() if 'log_a_q' in name or 'log_b_q' in name]
                 # base_params = [param for name, param in model.named_parameters() if not ('log_a_q' in name or 'log_b_q' in name)]

@@ -66,6 +66,63 @@ def fgsm_clf(model, x, y, eps=0.02, device='cuda'):
     loss.backward() 
     x_adv = x_adv + eps * x_adv.grad.sign()
     return x_adv.clamp(0, 1).detach()
+'''
+def pgd_clf_hj(model, x, y, eps=0.02, alpha=0.004, steps=20, device='cuda'):
+    x = x.to(device)
+    y = y.to(device)
+    x_adv = (x + torch.empty_like(x).uniform_(-eps, eps)).clamp(0,1).to(device)
+    for _ in range(steps):
+        x_adv.requires_grad_(True)
+        
+        logits_mc = [model(x_adv)[0] for _ in range(30)] # mc_runs is 30
+        avg_logits = torch.stack(logits_mc).mean(0)
+        # loss = F.cross_entropy(model(x_adv)[0], y.to(device))
+        loss = F.cross_entropy(avg_logits, y)
+        loss.backward()
+        with torch.no_grad():
+            x_adv = x_adv + alpha * x_adv.grad.sign()
+            x_adv = torch.max(torch.min(x_adv, x + eps), x - eps)
+            x_adv = x_adv.clamp(0, 1)
+    return x_adv.detach()
+'''
+
+import torch
+import torch.nn.functional as F
+
+def pgd_clf_hj(model, x, y, eps=0.02, alpha=0.004, steps=20, mc_runs=1, device='cuda'):
+    model.eval()  # 평가 모드로 설정
+    model.to(device)  # 모델을 지정된 장치로 이동
+    x = x.to(device)
+    y = y.to(device)
+    x_adv = (x + torch.empty_like(x).uniform_(-eps, eps)).clamp(0, 1).to(device)
+
+    for step in range(steps):
+        x_adv.requires_grad_(True)
+        
+        if x_adv.grad is not None:
+            x_adv.grad.zero_()
+
+        # MC 루프 시작
+        for i in range(mc_runs):
+            # [중요] 루프 내에서 생성되는 모든 텐서가 루프 종료 시 사라지도록 관리
+            logits = model(x_adv)[0]
+            loss = F.cross_entropy(logits, y) / mc_runs
+            loss.backward()
+
+            # [추가] 계산 그래프를 사용한 변수들을 명시적으로 삭제하여 메모리 누수 가능성을 차단합니다.
+            del logits, loss
+        
+        # [추가] 하나의 PGD 스텝에 대한 모든 그래디언트 누적이 끝난 후,
+        # 파이토치의 GPU 캐시 메모리를 정리합니다.
+        # 이 코드는 성능 저하를 일으킬 수 있으나, 메모리 누수 확인에 매우 효과적입니다.
+        # torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            x_adv = x_adv + alpha * x_adv.grad.sign()
+            x_adv = torch.max(torch.min(x_adv, x + eps), x - eps)
+            x_adv = x_adv.clamp(0, 1)
+            
+    return x_adv.detach()
 
 def pgd_clf(model, x, y, eps=0.02, alpha=0.004, steps=20, device='cuda'):
     x = x.to(device)
@@ -73,6 +130,7 @@ def pgd_clf(model, x, y, eps=0.02, alpha=0.004, steps=20, device='cuda'):
     x_adv = (x + torch.empty_like(x).uniform_(-eps, eps)).clamp(0,1).to(device)
     for _ in range(steps):
         x_adv.requires_grad_(True)
+        
         loss = F.cross_entropy(model(x_adv)[0], y.to(device))
         loss.backward()
         with torch.no_grad():

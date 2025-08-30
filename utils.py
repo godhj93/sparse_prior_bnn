@@ -67,6 +67,59 @@ def prune_model(model, sparsity, logger):
     total_sparsity = 1 - (remaining_params / total_params)
     logger.info(colored(f"Total sparsity: {total_sparsity:.2%}", 'yellow'))
     
+
+def prune_dnn_ffn_only(model, sparsity, logger):
+    """
+    DNN ViT 모델의 Transformer Block 내 FFN(MLP) 레이어에 대해서만
+    global unstructured pruning을 적용합니다.
+    
+    Args:
+        model (torch.nn.Module): 가지치기할 DNN ViT 모델.
+        sparsity (float): 가지치기 비율 (0.0 ~ 1.0).
+        logger: 로깅을 위한 객체.
+    """
+    # 1. FFN Linear 레이어만 선택하여 프루닝할 파라미터 목록 생성
+    parameters_to_prune = []
+    for name, module in model.named_modules():
+        # 표준 Linear 레이어이고, 이름에 '.mlp.'가 포함된 경우
+        if isinstance(module, nn.Linear) and '.mlp.' in name:
+            parameters_to_prune.append((module, 'weight'))
+
+    if not parameters_to_prune:
+        logger.warning("No FFN layers to prune were found.")
+        return
+
+    # 2. 선택된 FFN 레이어들에 대해 Global Unstructured Pruning 적용
+    prune.global_unstructured(
+        parameters_to_prune,
+        pruning_method=prune.L1Unstructured,
+        amount=sparsity,
+    )
+
+    # 3. 각 모듈별 및 전체 가지치기 결과 로깅
+    total_params = 0
+    remaining_params = 0
+    
+    logger.info("--- Pruning Results for DNN ViT ---")
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear) and '.mlp.' in name:
+            # 'weight_mask'가 있는지 확인하여 프루닝 적용 여부 판단
+            if hasattr(module, 'weight_mask'):
+                module_total = module.weight_orig.numel()
+                module_remaining = module.weight_mask.sum().item()
+                pruned_percentage = 1 - (module_remaining / module_total)
+                
+                total_params += module_total
+                remaining_params += module_remaining
+                
+                logger.info(f"{name}: {int(module_remaining)}/{int(module_total)} params remaining ({pruned_percentage:.2%} pruned)")
+
+    if total_params > 0:
+        total_sparsity = 1 - (remaining_params / total_params)
+        logger.info(colored(f"Total FFN Sparsity: {total_sparsity:.2%}", "yellow"))
+    else:
+        logger.info("No parameters were pruned.")
+
 def check_params(model):
     """
     모델의 파라미터 수를 출력합니다.
@@ -87,7 +140,8 @@ def get_model(args, logger):
         num_classes = 100
     elif args.data == 'tinyimagenet':
         num_classes = 200
-    
+    else:
+        raise ValueError(f"Unknown dataset: {args.data}")
     if args.type == 'dnn':
         
         if args.model == 'resnet20':
