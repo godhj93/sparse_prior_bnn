@@ -59,7 +59,8 @@ class BaseVariationalLayer_(nn.Module):
         """
         super().__init__()
         self._dnn_to_bnn_flag = False
-
+        
+        
         # # --- Spike-and-Slab을 위한 파라미터 ---
         # # 사후 분포의 포함 확률(alpha)을 학습 가능한 파라미터로 선언합니다.
         # # 로짓(logit) 공간에서 최적화하는 것이 수치적으로 안정적입니다.
@@ -128,7 +129,10 @@ class BaseVariationalLayer_(nn.Module):
         #     kl = log_q - log_p
         #     return kl.mean()
         elif prior_type == 'student-t':
-            L=10
+            if mu_q.requires_grad:
+                L=10
+            else:
+                L=1
             # print("Using Monte Carlo with L=10 samples for Student-t KL Divergence")
             nu = torch.tensor(1.0, device=mu_q.device)
     

@@ -153,6 +153,25 @@ def get_model(args, logger):
                 model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='nano')
             else:
                 model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='nano')
+        
+        elif args.model == 'vit-tiny-layernorm-micro':
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='micro')
+            else:
+                model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='micro')
+                
+        elif args.model == 'vit-tiny-layernorm-original':
+            if args.data == 'tinyimagenet':
+                model = ViT_Tiny_dnn(img_size=64, num_classes=num_classes, model='original')
+            else:
+                model = ViT_Tiny_dnn(num_classes=num_classes, img_size = 32, model='original')                
+
+        elif args.model == 'vit-tiny-layernorm-pico':
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='pico')
+            else:
+                model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='pico')
+                
         elif args.model == 'mlp':
             pass
         else:
@@ -169,6 +188,24 @@ def get_model(args, logger):
                 model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type)
             else:
                 model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 32, prior_type=args.prior_type)
+        elif args.model == 'vit-tiny-layernorm-micro':
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 64, prior_type=args.prior_type)
+            else:
+                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 32, prior_type=args.prior_type)
+                
+        elif args.model == 'vit-tiny-layernorm-original':
+            if args.data == 'tinyimagenet':
+                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 64, prior_type=args.prior_type)
+            else:
+                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 32, prior_type=args.prior_type)
+                
+        elif args.model == 'vit-tiny-layernorm-pico':
+            if args.data == 'tinyimagenet':
+                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 64, prior_type=args.prior_type)
+            else:
+                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 32, prior_type=args.prior_type)
+                
         elif args.model == 'mlp':
             pass
         else:
@@ -291,6 +328,52 @@ def get_dataset(args, logger):
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
          
+    elif args.data == 'svhn':
+        
+        logger.info(colored(f"SVHN dataset is loaded", 'green'))
+        img_size = 32
+        
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(img_size, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
+        ])
+        
+        transform_test = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
+        ])
+        
+        train_dataset = datasets.SVHN(root='./data/', split='train', transform=transform_train, download=True)
+        test_dataset = datasets.SVHN(root='./data/', split='test', transform=transform_test, download=True) 
+        
+        train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
+                                                  
+    elif args.data == 'fashionmnist':
+        
+        logger.info(colored(f"Fashion-MNIST dataset is loaded", 'green'))
+
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(28, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,))
+        ])
+        
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,))
+        ])
+        
+        train_dataset = datasets.FashionMNIST(root='./data/', train=True, transform=transform_train, download=True)
+        test_dataset = datasets.FashionMNIST(root='./data/', train=False, transform=transform_test)
+        
+        train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
+        
     else:
         raise ValueError('Dataset not found')
     

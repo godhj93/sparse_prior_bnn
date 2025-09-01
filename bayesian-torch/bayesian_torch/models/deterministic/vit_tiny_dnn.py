@@ -34,7 +34,7 @@ class ViT_Tiny_dnn(nn.Module):
             )
         elif model == 'micro':
             self.base_model = VisionTransformer(
-                img_size=32,
+                img_size=img_size,
                 patch_size=4,       # 작은 패치로 더 많은 특징 학습 (시퀀스 길이 64)
                 embed_dim=192,      # 표준적인 경량 모델의 임베딩 차원
                 depth=6,            # 중간 수준의 깊이
@@ -44,13 +44,13 @@ class ViT_Tiny_dnn(nn.Module):
             )
         elif model == 'pico':
             self.base_model = VisionTransformer(
-        img_size=32,
+        img_size=img_size,
         patch_size=4,
         embed_dim=256,      # 표현력을 위해 임베딩 차원 확장
         depth=7,            # 모델 깊이 추가
         num_heads=4,        # 확장된 임베딩 차원에 맞춰 헤드 수 증가
         mlp_ratio=3.0,      # 성능을 위해 MLP 비율을 소폭 상향
-        num_classes=100
+        num_classes=num_classes
     )
         # replace head
         num_ftrs = self.base_model.head.in_features
