@@ -21,11 +21,15 @@ from torch.utils.data import DistributedSampler
 # Load necessary models
 from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet20_bayesian
 from bayesian_torch.models.deterministic.resnet import resnet20 as resnet20_deterministic
+
 from bayesian_torch.models.bayesian.densenet_variational import densenet_bc_30_uni
 from bayesian_torch.models.deterministic.densenet import densenet_bc_30
+
 from bayesian_torch.models.deterministic.vit_tiny_dnn import ViT_Tiny_dnn, vit_tiny_dnn
 from bayesian_torch.models.bayesian.vit_tiny_uni import ViT_Tiny_uni, vit_tiny_uni
 
+from bayesian_torch.models.deterministic.mlp import MLP
+from bayesian_torch.models.bayesian.mlp_variational import MLP_uni
 import argparse
 
 def prune_model(model, sparsity, logger):
@@ -173,7 +177,9 @@ def get_model(args, logger):
                 model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='pico')
                 
         elif args.model == 'mlp':
-            pass
+            
+            model = MLP(input_dim=28*28, hidden_dims=[200, 100], output_dim=num_classes)
+            
         else:
             raise ValueError(f"Unknown model of type: {args.model} of type {args.type}")
         
@@ -207,7 +213,8 @@ def get_model(args, logger):
                 model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 32, prior_type=args.prior_type)
                 
         elif args.model == 'mlp':
-            pass
+            
+            model = MLP_uni(input_dim=28*28, hidden_dims=[200, 100], output_dim=num_classes, prior_type=args.prior_type)
         else:
             raise ValueError(f"Unknown model of type: {args.model} of type {args.type}")
         
@@ -220,6 +227,8 @@ def get_model(args, logger):
     return model
 
 def get_dataset(args, logger):
+    
+    assert args.data in ['mnist', 'fashionmnist', 'cifar10', 'cifar100', 'tinyimagenet', 'svhn'], "Dataset not found"
     
     if args.data == 'mnist':
         
@@ -239,6 +248,27 @@ def get_dataset(args, logger):
         
         train_dataset = datasets.MNIST(root='./data/', train=True, transform=transform_train, download=True)
         test_dataset = datasets.MNIST(root='./data/', train=False, transform=transform_test)
+        
+        train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
+        
+    elif args.data == 'fashionmnist':
+        logger.info(colored(f"Fashion-MNIST dataset is loaded", 'green'))
+
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(28, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,))
+        ])
+        
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.2860,), (0.3530,))
+        ])
+        
+        train_dataset = datasets.FashionMNIST(root='./data/', train=True, transform=transform_train, download=True)
+        test_dataset = datasets.FashionMNIST(root='./data/', train=False, transform=transform_test)
         
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)

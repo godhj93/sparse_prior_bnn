@@ -491,7 +491,7 @@ def evaluate(model, best_model_weight, device, args, logger):
     else:
         raise NotImplementedError("Not implemented yet")
     
-    if args.data == 'cifar10':
+    if args.data == 'cifar10' or 'svhn' or 'mnist' or 'fashionmnist':
         logger.info(colored("Clustering performance evaluation starting...", 'blue'))
         # TSNE
         # 데이터 로드
@@ -507,6 +507,12 @@ def evaluate(model, best_model_weight, device, args, logger):
                             (0.2302, 0.2265, 0.2262)),
             "cifar10": ((0.4914, 0.4822, 0.4465),
                         (0.2023, 0.1994, 0.2010)),
+
+            "svhn": ((0.4377, 0.4438, 0.4728),
+                     (0.1980, 0.2010, 0.1970)),
+            
+            "mnist": ((0.1307,), (0.3081,)),
+            "fashionmnist": ((0.2860,), (0.3530,)),
         }
 
 
@@ -520,7 +526,35 @@ def evaluate(model, best_model_weight, device, args, logger):
                 ]),
                 download=True,
             ),
+            "svhn": lambda root: datasets.SVHN(
+                root=root,
+                split='test',
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["svhn"]),
+                ]),
+                download=True,
+            ),
+            "mnist": lambda root: datasets.MNIST(
+                root=root,
+                train=False,
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["mnist"]),
+                ]),
+                download=True,
+            ),
+            "fashionmnist": lambda root: datasets.FashionMNIST(
+                root=root,
+                train=False,
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["fashionmnist"]),
+                ]),
+                download=True,
+            )
 
+            
             # # ★ 여기 root 경로 수정:  .../val  (images 아님!)
             # "TinyImageNet": lambda root: ImageFolder(
             #     root=os.path.join(root, "tiny-imagenet-200", "val"),
@@ -532,8 +566,27 @@ def evaluate(model, best_model_weight, device, args, logger):
             # ),
         }
         
-        dataset = CLASSIFICATION_DATASETS[args.data]("./data")
-        num_classes = len(dataset.classes)
+        if args.data == 'svhn':
+            dataset = datasets.SVHN(root='./data/', split='test', transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["svhn"]),
+                ]), download=True) 
+            num_classes = 10
+        elif args.data == 'mnist':
+            dataset = datasets.MNIST(root='./data/', train=False, transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["mnist"]),
+                ]), download=True)
+            num_classes = 10
+        elif args.data == 'fashionmnist':
+            dataset = datasets.FashionMNIST(root='./data/', train=False, transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(*IMG_STATS["fashionmnist"]),
+                ]), download=True)
+            num_classes = 10    
+        else:
+            dataset = CLASSIFICATION_DATASETS[args.data]("./data")
+            num_classes = len(dataset.classes)
 
         counter = {i: 0 for i in range(num_classes)}
         sel_idx: List[int] = []
@@ -710,7 +763,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_neighbors', type=int, default=15)         # UMAP
     parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
-    parser.add_argument('--save_results', action='store_true', help='Save experiment results to a JSON file')
+    parser.add_argument('--save_results', action='store_true', default=True, help='Save results to a json file')
     args = parser.parse_args()
     
     print(colored(args, 'green'))

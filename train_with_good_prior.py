@@ -225,6 +225,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     
-    assert args.ood is not None, "Please provide OOD datasets to evaluate using --ood argument."
+    assert args.ood in [['svhn'], ['cifar10'], ['mnist'], ['fashionmnist']], "OOD datasets not supported"
+
     print(colored(f"Arguments: {args}", 'yellow'))
     main(args)
