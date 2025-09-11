@@ -7,6 +7,9 @@ from sklearn.metrics import roc_curve, roc_auc_score
 import argparse
 import logging
 from utils import get_model, get_dataset, test_BNN, test_DNN
+import json
+import os
+import ast
 
 def compute_tr_h_bnn(model, loader, criterion, device, mc_runs=30, num_hvp_iter=10):
     """
@@ -399,7 +402,7 @@ def compute_ece_and_plot_confidence_vs_accuracy_batches(confidences_batches, pre
         bin_mask = (all_confidences > bin_lower) & (all_confidences <= bin_upper)
         bin_size = np.sum(bin_mask)
         
-        if bin_size > 0:
+        if (bin_size > 0):
             acc = np.mean(all_preds[bin_mask] == all_labels[bin_mask])
             conf = np.mean(all_confidences[bin_mask])
             
@@ -491,7 +494,7 @@ def evaluate(model, best_model_weight, device, args, logger):
     else:
         raise NotImplementedError("Not implemented yet")
     
-    if args.data == 'cifar10' or 'svhn' or 'mnist' or 'fashionmnist':
+    if args.data in ['cifar10' , 'svhn' , 'mnist' , 'fashionmnist']:
         logger.info(colored("Clustering performance evaluation starting...", 'blue'))
         # TSNE
         # 데이터 로드
@@ -624,7 +627,7 @@ def evaluate(model, best_model_weight, device, args, logger):
         rho = global_rank_corr(feats.numpy(), Y)
 
         print("\n=== Metrics ===")
-        print(f"Silhouette={sil:.3f}  DaviesBouldin={db:.3f}  PR={pr:.2f}  GV={gv:.2e}  Spearmanρ={rho:.3f}\n")
+        print(f"Silhouette={sil:.3f}  DaviesBouldin={db:.3f}  PR={pr:.2f}  GV={gv:.3e}  Spearmanρ={rho:.3f}\n")
 
         experiment_results['clustering_performance'] = {
             'silhouette': sil,
@@ -764,12 +767,26 @@ if __name__ == '__main__':
     parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
     parser.add_argument('--save_results', action='store_true', default=True, help='Save results to a json file')
+    parser.add_argument('--sparsity', type=float, default=0.0, help='sparsity level for sparse prior')
+    parser.add_argument('--std', type=float, default=1.0, help='std for normal prior')
     args = parser.parse_args()
+
+    # ast.literal_eval을 사용하여 문자열 형식의 리스트를 실제 리스트로 변환
+    if isinstance(args.ood, list) and len(args.ood) == 1:
+        try:
+            args.ood = ast.literal_eval(args.ood[0])
+        except (ValueError, SyntaxError):
+            # 만약 변환에 실패하면, 원래 값(문자열 리스트)을 그대로 사용
+            pass
+
+    # 로깅 설정
+    log_dir = 'logs'
+    os.makedirs(log_dir, exist_ok=True)
     
     print(colored(args, 'green'))
     
     # Load json config if exists
-    import os, json
+    import os, json, ast
     if os.path.exists(args.weight.replace('.pth', '_results.json')):
         with open(args.weight.replace('.pth', '_results.json'), 'r') as f:
             saved_args = json.load(f)
@@ -790,5 +807,58 @@ if __name__ == '__main__':
                 setattr(args, key, value)
         print(colored("Loaded args from config file:", 'yellow'))
         print(colored(saved_args['info'], 'red'))
+    else:
+        # Load "config.txt" (exists in same folder as weights)
+        # Get directory path from args.weight
+        dir_path = os.path.dirname(args.weight)
+        config_path = os.path.join(dir_path, 'config.txt')
+        if os.path.exists(config_path):
+            # Config contains lines like key:value
+            with open(config_path, 'r') as f:
+                for line in f:
+                    if ':' in line:
+                        key, value = line.strip().split(':', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        if key in ['weight', 'data', 'ood']:
+                            continue
+                        elif key == 'pruned_dnn_acc':
+                            args.pruned_dnn_acc = float(value)
+                        elif key == 'pruned_dnn_loss':
+                            args.pruned_dnn_loss = float(value)
+                        elif key == 'pruned_dnn_sparsity':
+                            args.pruned_dnn_sparsity = float(value)
+                        if hasattr(args, key):
+                            # Convert to appropriate type
+                            current_val = getattr(args, key)
+                            current_type = type(current_val)
 
+                            if current_val is None and key == 'ood': # Special case for ood which is a list
+                                try:
+                                    value = ast.literal_eval(value)
+                                except (ValueError, SyntaxError):
+                                    pass # Keep as string if it fails
+                            elif current_type == bool:
+                                value = value.lower() in ['true', '1', 'yes']
+                            elif current_val is not None:
+                                value = current_type(value)
+                            else: # For other args with default None, try to infer
+                                try:
+                                    value = ast.literal_eval(value)
+                                except (ValueError, SyntaxError):
+                                    pass # Keep as string
+                            
+                            # Set MC runs as 30 for evaluation
+                            if key == 'mc_runs':
+                                value = 30
+                            
+                            setattr(args, key, value)
+                        else:
+                            # If the argument does not exist in current args, add it
+                            try:
+                                value = ast.literal_eval(value)
+                            except (ValueError, SyntaxError):
+                                pass # Keep as string if it fails
+
+    print(args)
     main(args)

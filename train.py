@@ -196,11 +196,11 @@ if __name__ == "__main__":
     parser.add_argument('--min_dist', type=float, default=0.1)         # UMAP
     parser.add_argument('--eps', type=float, default=0.02, help='Epsilon for adversarial attack')
     parser.add_argument('--save_results', default = True, action='store_true', help='Save experiment results to a JSON file')
-
+    parser.add_argument('--spike_and_slab_pi', type=float, default=0.5, help='Mixture coefficient for the spike-and-slab prior')
     args = parser.parse_args()
     
     assert args.moped == False, "The --moped argument is deprecated and should not be used. Use --MOPED instead."
-    assert args.ood in [['svhn'], ['cifar10'], ['mnist'], ['fashionmnist']], "OOD datasets not supported"
+    # assert args.ood in [['svhn'], ['cifar100'], ['mnist'], ['fashionmnist'], ['tinyimagenet']], "OOD datasets not supported"
     if args.prune:
         args.weight_decay = 0.0
         print(colored("Pruning is enabled. Setting weight decay to 0.", 'red'))

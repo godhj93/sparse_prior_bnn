@@ -186,35 +186,35 @@ def get_model(args, logger):
     elif args.type == 'uni':
         
         if args.model == 'resnet20':
-            model = resnet20_bayesian(num_classes = num_classes, prior_type=args.prior_type)
+            model = resnet20_bayesian(num_classes = num_classes, prior_type=args.prior_type, args = args)
         elif args.model == 'densenet30':
-            model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type)
+            model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type, args = args)
         elif args.model == 'vit-tiny-layernorm-nano':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type, args = args)
             else:
-                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 32, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 32, prior_type=args.prior_type, args = args)
         elif args.model == 'vit-tiny-layernorm-micro':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 64, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 64, prior_type=args.prior_type, args = args)
             else:
-                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 32, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 32, prior_type=args.prior_type, args = args)
                 
         elif args.model == 'vit-tiny-layernorm-original':
             if args.data == 'tinyimagenet':
                 model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 64, prior_type=args.prior_type)
             else:
-                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 32, prior_type=args.prior_type)
+                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 32, prior_type=args.prior_type, args = args)
                 
         elif args.model == 'vit-tiny-layernorm-pico':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 64, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 64, prior_type=args.prior_type, args = args)
             else:
-                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 32, prior_type=args.prior_type)
+                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 32, prior_type=args.prior_type, args = args)
                 
         elif args.model == 'mlp':
             
-            model = MLP_uni(input_dim=28*28, hidden_dims=[200, 100], output_dim=num_classes, prior_type=args.prior_type)
+            model = MLP_uni(input_dim=28*28, hidden_dims=[200, 100], output_dim=num_classes, prior_type=args.prior_type, args = args)
         else:
             raise ValueError(f"Unknown model of type: {args.model} of type {args.type}")
         

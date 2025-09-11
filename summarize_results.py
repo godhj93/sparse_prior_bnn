@@ -108,13 +108,31 @@ def main(args, output_csv_file):
     output_csv_file = os.path.join(args.search_root, output_csv_file)
     df = pd.DataFrame(all_results)
 
-    # 'sparsity'가 비어있는 경우(NaN)를 식별하기 위해 숫자형으로 변환
-    df['sparsity'] = pd.to_numeric(df['sparsity'], errors='coerce').fillna(0)
+    # 'sparsity'와 'std' 열에 대해 결측치를 0.0으로 채웁니다.
+    # 베이스라인 모델들은 sparsity가 없으므로, 필터링 및 정렬을 위해 기본값을 설정합니다.
+    if 'sparsity' in df.columns:
+        df['sparsity'] = pd.to_numeric(df['sparsity'], errors='coerce').fillna(0.0)
+    if 'std' in df.columns:
+        df['std'] = pd.to_numeric(df['std'], errors='coerce').fillna(0.0)
+
+    # 숫자 형식으로 변환할 열 목록
+    numeric_cols = [
+        'pruned_dnn_accuracy', 'pruned_dnn_nll', 'pruned_dnn_sparsity',
+        'id_accuracy', 'id_nll', 'id_kld', 'clustering_silhouette',
+        'clustering_davies_bouldin', 'clustering_pr', 'clustering_global_variance',
+        'clustering_spearman_rho'
+    ]
+    # ood 및 adversarial 관련 열도 동적으로 추가
+    numeric_cols.extend([col for col in df.columns if col.startswith('ood_') or col.startswith('adversarial_')])
+
+    for col in numeric_cols:
+        if col in df.columns:
+            # 다른 숫자 열들은 변환할 수 없는 경우 NaN으로 유지합니다.
+            df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # 정렬 순서 적용:
-    # 1. sparsity가 비어있는 행을 맨 위로 (isnull()이 True인 경우)
-    # 2. moped가 True인 행을 위로
-    # 3. sparsity 값에 따라 오름차순으로 정렬
+    # 1. moped가 True인 행을 위로
+    # 2. sparsity 값에 따라 오름차순으로 정렬
     df = df.sort_values(by=['moped', 'sparsity'], ascending=[False, True])
 
     # CSV 파일로 저장
