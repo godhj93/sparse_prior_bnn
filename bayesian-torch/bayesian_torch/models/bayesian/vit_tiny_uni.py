@@ -29,11 +29,11 @@ class ViT_Tiny_uni(nn.Module):
         if model == 'original':
             self.base_model = VisionTransformer(
                 img_size=img_size,
-                patch_size=4,
+                patch_size=16,
                 embed_dim=192 // 2,
-                depth=6 // 2,
+                depth=4,
                 num_heads=3,
-                mlp_ratio=4.0,
+                mlp_ratio=2.0,
                 num_classes=num_classes
             )
         elif model == 'nano':
@@ -87,7 +87,6 @@ class ViT_Tiny_uni(nn.Module):
             # "padding_mode": old_proj.padding_mode
         }
         self.base_model.patch_embed.proj = nn.Conv2d(**conv2d_params)
-        
         
     def forward(self, x):
         out = self.base_model(x)

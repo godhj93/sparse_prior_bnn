@@ -12,7 +12,6 @@ import os
 from torchvision import datasets, transforms
 from torchvision.datasets import ImageFolder
 
-from mix import mixup_data, cutmix_data, mixup_criterion
 # Distirbuted Data Parallel
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os 
@@ -358,27 +357,60 @@ def get_dataset(args, logger):
             
         logger.info(colored(f"TinyImageNet dataset is loaded", 'green'))
         
-        transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(img_size),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
+        if args.model in ['vit-tiny-layernorm-original']:
+            img_size = 64
+            from vits_for_small_scale_datasets.utils.autoaug import ImageNetPolicy
+            from vits_for_small_scale_datasets.utils.random_erasing import RandomErasing
+            from vits_for_small_scale_datasets.utils.sampler import RASampler
+            re = 0.25
+            re_sh = 0.4
+            re_r1 = 0.3
+            ra = 3
+            augmentations = [
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(64, padding=4),
+                ImageNetPolicy(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
+                RandomErasing(probability = re, sh = re_sh, r1 = re_r1, mean = [0.4802, 0.4481, 0.3975])
+            ]
+            
+            transform_train = transforms.Compose(augmentations)
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
+            ])
+            train_dataset = ImageFolder(root='data/tiny-imagenet-200/train/', transform = transform_train)
+            test_dataset = ImageFolder(root='data/tiny-imagenet-200/val/', transform = transform_test)
+            
+            train_loader = torch.utils.data.DataLoader(
+                train_dataset, batch_sampler = RASampler(len(train_dataset), args.bs, 1, ra, shuffle=True, drop_last=True)
+            )
+            test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
+            
+        else:
+            transform_train = transforms.Compose([
+                transforms.RandomResizedCrop(img_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
+                
 
-        ])
-        
-        transform_test = transforms.Compose([
-            transforms.Resize(img_size),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
+            ])
+            
+            transform_test = transforms.Compose([
+                transforms.Resize(img_size),
+                transforms.ToTensor(),
+                transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
 
-        ])
-        
-        train_dataset = ImageFolder(root='data/tiny-imagenet-200/train/', transform = transform_train)
-        test_dataset = ImageFolder(root='data/tiny-imagenet-200/val/', transform = transform_test)
-        
-        train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
-        test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
-         
+            ])
+            
+            train_dataset = ImageFolder(root='data/tiny-imagenet-200/train/', transform = transform_train)
+            test_dataset = ImageFolder(root='data/tiny-imagenet-200/val/', transform = transform_test)
+            
+            train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
+            test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
+            
         
     elif args.data == 'svhn':
         
@@ -671,44 +703,49 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
             data, target = batch_data[0], batch_data[1]
             data, target = data.to(device).squeeze(1), target.to(device)
             
-            # if args.data == 'tinyimagenet':
-            #     # print("Using CutMix or MixUp")
-            #     np.int = int
-            #     args.alpha = 1.0
-            #     args.beta = 1.0
-            #     r = np.random.rand(1)
-            #     if r < 0.5:
-            #         switching_prob = np.random.rand(1)
+            if args.model in ['vit-tiny-layernorm-original']:
+                from vits_for_small_scale_datasets.utils.mix import cutmix_data, mixup_data, mixup_criterion
+                from vits_for_small_scale_datasets.utils.losses import LabelSmoothingCrossEntropy
+                criterion = LabelSmoothingCrossEntropy()
+                # print("Using CutMix or MixUp")
+                np.int = int
+                args.alpha = 1.0
+                args.beta = 1.0
+                r = np.random.rand(1)
+                if r < 0.5:
+                    switching_prob = np.random.rand(1)
                     
-            #         # Cutmix
-            #         if switching_prob < 0.5:
-            #             slicing_idx, y_a, y_b, lam, sliced = cutmix_data(data, target, args)
-            #             data[:, :, slicing_idx[0]:slicing_idx[2], slicing_idx[1]:slicing_idx[3]] = sliced
-            #             output = model(data)
+                    # Cutmix
+                    if switching_prob < 0.5:
+                        slicing_idx, y_a, y_b, lam, sliced = cutmix_data(data, target, args)
+                        data[:, :, slicing_idx[0]:slicing_idx[2], slicing_idx[1]:slicing_idx[3]] = sliced
+                        output = model(data)
                         
-            #             loss =  mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
+                        loss =  mixup_criterion(criterion, output, y_a, y_b, lam)
                         
                         
-            #         # Mixup
-            #         else:
-            #             data, y_a, y_b, lam = mixup_data(data, target, args)
-            #             output = model(data)
-            #             loss = mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
-            #     else:
-            #         output = model(data)
-            #         loss = F.cross_entropy(output, target)
-            #     optimizer.zero_grad()
-            #     loss.backward()
-            #     _, predicted = torch.max(output.data, 1)
-            #     optimizer.step()
-            #     args.scheduler.step()
-            # else:
-            optimizer.zero_grad()
-            output = model(data)
-            _, predicted = torch.max(output.data, 1)
-            loss = F.cross_entropy(output, target)
-            loss.backward()
-            optimizer.step()
+                    # Mixup
+                    else:
+                        data, y_a, y_b, lam = mixup_data(data, target, args)
+                        output = model(data)
+                        loss = mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
+                else:
+                    output = model(data)
+                    loss = criterion(output, target)
+                    
+                optimizer.zero_grad()
+                loss.backward()
+                _, predicted = torch.max(output.data, 1)
+                optimizer.step()
+                args.scheduler.step()
+                
+            else:
+                optimizer.zero_grad()
+                output = model(data)
+                _, predicted = torch.max(output.data, 1)
+                loss = F.cross_entropy(output, target)
+                loss.backward()
+                optimizer.step()
             
             nlls.append(loss.item())
             correct += (predicted == target).sum().item()
@@ -718,7 +755,7 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
 
             # writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], batch_idx + e * len(train_loader))
             
-        args.scheduler.step()
+        # args.scheduler.step()
         acc_test, nll_test = test_DNN(model, test_loader, device, args)
         logger.info(f"[Test] Acc: {acc_test:.3f}, NLL: {nll_test:.3f}")
         

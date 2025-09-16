@@ -13,15 +13,14 @@ class ViT_Tiny_dnn(nn.Module):
         
         # load ViT backbone
         if model == 'original':
-            self.base_model = VisionTransformer(
-                img_size=32,
-                patch_size=4,
-                embed_dim=192 // 2,
-                depth=6 // 2,
-                num_heads=3,
-                mlp_ratio=4.0,
-                num_classes=num_classes
-            )
+            if img_size == 32:
+                patch_size = 4
+            elif img_size == 64:
+                patch_size = 8
+            else:
+                raise ValueError("img_size must be 32 or 64 for the 'original' model.")
+            self.base_model = VisionTransformer(img_size=img_size, patch_size=patch_size, embed_dim=192, depth=12, num_heads=3, mlp_ratio=2)
+            
         elif model == 'nano':
             self.base_model = VisionTransformer(
                 img_size=img_size,

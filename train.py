@@ -24,7 +24,8 @@ def main(args):
     train_loader, test_loader = get_dataset(args = args, logger = logger)
     
     optim = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov = args.nesterov)
-    
+  
+        
     prior_params = [param for name, param in model.named_parameters() if 'log_a_q' in name or 'log_b_q' in name]
     base_params = [param for name, param in model.named_parameters() if not ('log_a_q' in name or 'log_b_q' in name)]
 
@@ -44,6 +45,14 @@ def main(args):
     # args.scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[args.epochs//3, args.epochs//3*2], gamma=0.1)
     args.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=args.epochs, eta_min=args.lr/100.0)
     
+    if args.model == 'vit-tiny-layernorm-original':
+        from vits_for_small_scale_datasets.utils.scheduler import build_scheduler
+        args.optimizer = 'adamw'
+        args.lr = 1e-3
+        args.weight_decay = 5e-2
+        optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        args.scheduler = build_scheduler(args, optim, len(train_loader))
+        
     log_params = {
         'model': args.model,
         'type': args.type,
