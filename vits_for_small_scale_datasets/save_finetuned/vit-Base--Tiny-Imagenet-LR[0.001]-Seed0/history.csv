@@ -1,0 +1,48 @@
+T-IMNET
+Creating model: vit-Base--Tiny-Imagenet-LR[0.001]-Seed0
+Number of params: 3,807,400
+Initial learning rate: 0.001000
+Start training for 100 epochs
+label smoothing used
+Stochastic depth(0.1) used 
+Cutmix used
+Mixup used
+Repeated Aug(3) used
+Autoaugmentation used
+T-IMNET
+Creating model: vit-Base--Tiny-Imagenet-LR[0.001]-Seed0
+Number of params: 3,807,400
+Initial learning rate: 0.001000
+Start training for 100 epochs
+label smoothing used
+Stochastic depth(0.1) used 
+Cutmix used
+Mixup used
+Repeated Aug(3) used
+Autoaugmentation used
+Random erasing(0.25) used 
+T-IMNET
+Creating model: vit-Base--Tiny-Imagenet-LR[0.001]-Seed0
+Number of params: 3,807,400
+Initial learning rate: 0.001000
+Start training for 100 epochs
+label smoothing used
+Stochastic depth(0.1) used 
+Cutmix used
+Mixup used
+Repeated Aug(3) used
+Autoaugmentation used
+Random erasing(0.25) used 
+T-IMNET
+Creating model: vit-Base--Tiny-Imagenet-LR[0.001]-Seed0
+Number of params: 3,807,400
+Initial learning rate: 0.001000
+Start training for 100 epochs
+label smoothing used
+Stochastic depth(0.1) used 
+Cutmix used
+Mixup used
+Repeated Aug(3) used
+Autoaugmentation used
+Random erasing(0.25) used 
+best top-1: 52.25, final top-1: 52.24
