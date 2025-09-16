@@ -12,6 +12,7 @@ import os
 from torchvision import datasets, transforms
 from torchvision.datasets import ImageFolder
 
+from mix import mixup_data, cutmix_data, mixup_criterion
 # Distirbuted Data Parallel
 from torch.nn.parallel import DistributedDataParallel as DDP
 import os 
@@ -21,10 +22,13 @@ from torch.utils.data import DistributedSampler
 # Load necessary models
 from bayesian_torch.models.bayesian.resnet_variational import resnet20 as resnet20_bayesian
 from bayesian_torch.models.deterministic.resnet import resnet20 as resnet20_deterministic
-
+from bayesian_torch.models.deterministic.resnet_large import resnet18 as resnet18_deterministic
+from bayesian_torch.models.bayesian.resnet_variational_large import resnet18 as resnet18_bayesian
 from bayesian_torch.models.bayesian.densenet_variational import densenet_bc_30_uni
 from bayesian_torch.models.deterministic.densenet import densenet_bc_30
-
+from bayesian_torch.models.deterministic.densenet import densenet_bc_121
+from bayesian_torch.models.deterministic.mobilenet import MobileNet
+from bayesian_torch.models.bayesian.mobilenet_uni import MobileNet_uni
 from bayesian_torch.models.deterministic.vit_tiny_dnn import ViT_Tiny_dnn, vit_tiny_dnn
 from bayesian_torch.models.bayesian.vit_tiny_uni import ViT_Tiny_uni, vit_tiny_uni
 
@@ -144,35 +148,45 @@ def get_model(args, logger):
         num_classes = 100
     elif args.data == 'tinyimagenet':
         num_classes = 200
+        img_size = 64
     else:
         raise ValueError(f"Unknown dataset: {args.data}")
     if args.type == 'dnn':
         
         if args.model == 'resnet20':
             model = resnet20_deterministic(num_classes=num_classes)
+        elif args.model == 'resnet18':
+            model = resnet18_deterministic(num_classes=num_classes)
+            
         elif args.model == 'densenet30':
             model = densenet_bc_30(num_classes=num_classes)
+        elif args.model == 'densenet121':
+            model = densenet_bc_121(num_classes=num_classes)
+            
+        elif args.model == 'mobilenet':
+            model = MobileNet(num_classes=num_classes)
+            
         elif args.model == 'vit-tiny-layernorm-nano':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='nano')
+                model = vit_tiny_dnn(img_size=img_size, num_classes=num_classes, model='nano')
             else:
                 model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='nano')
         
         elif args.model == 'vit-tiny-layernorm-micro':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='micro')
+                model = vit_tiny_dnn(img_size=img_size, num_classes=num_classes, model='micro')
             else:
                 model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='micro')
                 
         elif args.model == 'vit-tiny-layernorm-original':
             if args.data == 'tinyimagenet':
-                model = ViT_Tiny_dnn(img_size=64, num_classes=num_classes, model='original')
+                model = ViT_Tiny_dnn(img_size=img_size, num_classes=num_classes, model='original')
             else:
                 model = ViT_Tiny_dnn(num_classes=num_classes, img_size = 32, model='original')                
 
         elif args.model == 'vit-tiny-layernorm-pico':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_dnn(img_size=64, num_classes=num_classes, model='pico')
+                model = vit_tiny_dnn(img_size=img_size, num_classes=num_classes, model='pico')
             else:
                 model = vit_tiny_dnn(num_classes=num_classes, img_size = 32, model='pico')
                 
@@ -187,28 +201,35 @@ def get_model(args, logger):
         
         if args.model == 'resnet20':
             model = resnet20_bayesian(num_classes = num_classes, prior_type=args.prior_type, args = args)
+            
+        elif args.model == 'resnet18':
+            model = resnet18_bayesian(num_classes=num_classes, prior_type=args.prior_type, args = args)
         elif args.model == 'densenet30':
             model = densenet_bc_30_uni(num_classes=num_classes, prior_type=args.prior_type, args = args)
+
+        elif args.model == 'mobilenet':
+            model = MobileNet_uni(num_classes=num_classes, prior_type=args.prior_type)
+            
         elif args.model == 'vit-tiny-layernorm-nano':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 64, prior_type=args.prior_type, args = args)
+                model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = img_size, prior_type=args.prior_type, args = args)
             else:
                 model = vit_tiny_uni(num_classes=num_classes, model='nano', img_size = 32, prior_type=args.prior_type, args = args)
         elif args.model == 'vit-tiny-layernorm-micro':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 64, prior_type=args.prior_type, args = args)
+                model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = img_size, prior_type=args.prior_type, args = args)
             else:
                 model = vit_tiny_uni(num_classes=num_classes, model='micro', img_size = 32, prior_type=args.prior_type, args = args)
                 
         elif args.model == 'vit-tiny-layernorm-original':
             if args.data == 'tinyimagenet':
-                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 64, prior_type=args.prior_type)
+                model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = img_size, prior_type=args.prior_type)
             else:
                 model = ViT_Tiny_uni(num_classes=num_classes, model='original', img_size = 32, prior_type=args.prior_type, args = args)
                 
         elif args.model == 'vit-tiny-layernorm-pico':
             if args.data == 'tinyimagenet':
-                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 64, prior_type=args.prior_type, args = args)
+                model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = img_size, prior_type=args.prior_type, args = args)
             else:
                 model = vit_tiny_uni(num_classes=num_classes, model='pico', img_size = 32, prior_type=args.prior_type, args = args)
                 
@@ -228,7 +249,7 @@ def get_model(args, logger):
 
 def get_dataset(args, logger):
     
-    assert args.data in ['mnist', 'fashionmnist', 'cifar10', 'cifar100', 'tinyimagenet', 'svhn'], "Dataset not found"
+    # assert args.data in ['mnist', 'fashionmnist', 'cifar10', 'cifar100', 'tinyimagenet', 'svhn'], f"Dataset: {args.data} not supported"
     
     if args.data == 'mnist':
         
@@ -307,7 +328,7 @@ def get_dataset(args, logger):
         img_size = 32
         
         if 'cifar100' in args.ood:# Assume Model is trained for Tiny ImageNet (64x64)
-            img_size = 64
+            img_size = 224
             
         transform_train = transforms.Compose([
             transforms.RandomCrop(img_size, padding=4),
@@ -329,8 +350,8 @@ def get_dataset(args, logger):
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
         
     elif args.data == 'tinyimagenet':
-        
-        img_size = 64
+
+        img_size = 224
         
         if 'tinyimagenet' in args.ood:
             img_size = 32
@@ -341,7 +362,7 @@ def get_dataset(args, logger):
             transforms.RandomResizedCrop(img_size),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262))
+            transforms.Normalize((0.4802, 0.4481, 0.3975), (0.2302, 0.2265, 0.2262)),
 
         ])
         
@@ -358,10 +379,14 @@ def get_dataset(args, logger):
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True)
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True)
          
+        
     elif args.data == 'svhn':
         
         logger.info(colored(f"SVHN dataset is loaded", 'green'))
         img_size = 32
+        
+        if 'svhn' in args.ood: # Assume Model is trained for Tiny ImageNet (64x64)
+            img_size = 64
         
         transform_train = transforms.Compose([
             transforms.RandomCrop(img_size, padding=4),
@@ -645,7 +670,39 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
             
             data, target = batch_data[0], batch_data[1]
             data, target = data.to(device).squeeze(1), target.to(device)
-                
+            
+            # if args.data == 'tinyimagenet':
+            #     # print("Using CutMix or MixUp")
+            #     np.int = int
+            #     args.alpha = 1.0
+            #     args.beta = 1.0
+            #     r = np.random.rand(1)
+            #     if r < 0.5:
+            #         switching_prob = np.random.rand(1)
+                    
+            #         # Cutmix
+            #         if switching_prob < 0.5:
+            #             slicing_idx, y_a, y_b, lam, sliced = cutmix_data(data, target, args)
+            #             data[:, :, slicing_idx[0]:slicing_idx[2], slicing_idx[1]:slicing_idx[3]] = sliced
+            #             output = model(data)
+                        
+            #             loss =  mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
+                        
+                        
+            #         # Mixup
+            #         else:
+            #             data, y_a, y_b, lam = mixup_data(data, target, args)
+            #             output = model(data)
+            #             loss = mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
+            #     else:
+            #         output = model(data)
+            #         loss = F.cross_entropy(output, target)
+            #     optimizer.zero_grad()
+            #     loss.backward()
+            #     _, predicted = torch.max(output.data, 1)
+            #     optimizer.step()
+            #     args.scheduler.step()
+            # else:
             optimizer.zero_grad()
             output = model(data)
             _, predicted = torch.max(output.data, 1)

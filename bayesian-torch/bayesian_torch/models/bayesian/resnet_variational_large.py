@@ -31,7 +31,7 @@ model_urls = {
 }
 
 
-def conv3x3(in_planes, out_planes, stride=1):
+def conv3x3(in_planes, out_planes, stride=1, prior_type=None):
     """3x3 convolution with padding"""
     return Conv2dReparameterization(in_channels=in_planes,
                                     out_channels=out_planes,
@@ -42,18 +42,19 @@ def conv3x3(in_planes, out_planes, stride=1):
                                     prior_variance=prior_sigma,
                                     posterior_mu_init=posterior_mu_init,
                                     posterior_rho_init=posterior_rho_init,
-                                    bias=False)
+                                    bias=False,
+                                    prior_type=prior_type)
 
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, prior_type=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = conv3x3(inplanes, planes, stride, prior_type=prior_type)
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = conv3x3(planes, planes, prior_type=prior_type)
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
         self.stride = stride
@@ -83,7 +84,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, prior_type=None):
         super(Bottleneck, self).__init__()
         self.conv1 = Conv2dReparameterization(
             in_channels=inplanes,
@@ -93,7 +94,8 @@ class Bottleneck(nn.Module):
             prior_variance=prior_sigma,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
-            bias=False)
+            bias=False,
+            prior_type=prior_type)
         self.bn1 = nn.BatchNorm2d(planes)
         self.conv2 = Conv2dReparameterization(
             in_channels=planes,
@@ -105,7 +107,8 @@ class Bottleneck(nn.Module):
             prior_variance=prior_sigma,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
-            bias=False)
+            bias=False,
+            prior_type=prior_type)
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = Conv2dReparameterization(
             in_channels=planes,
@@ -115,7 +118,8 @@ class Bottleneck(nn.Module):
             prior_variance=prior_sigma,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
-            bias=False)
+            bias=False,
+            prior_type=prior_type   )
         self.bn3 = nn.BatchNorm2d(planes * 4)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -149,7 +153,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes=1000):
+    def __init__(self, block, layers, num_classes=1000, args = None, prior_type=None):
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1 = Conv2dReparameterization(
@@ -162,14 +166,16 @@ class ResNet(nn.Module):
             prior_variance=prior_sigma,
             posterior_mu_init=posterior_mu_init,
             posterior_rho_init=posterior_rho_init,
-            bias=False)
+            bias=False,
+            prior_type=prior_type)
+        
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.layer1 = self._make_layer(block, 64, layers[0], prior_type=prior_type)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, prior_type=prior_type)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, prior_type=prior_type)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, prior_type=prior_type)
         self.avgpool = nn.AvgPool2d(7, stride=1)
         self.fc = LinearReparameterization(
             in_features=512 * block.expansion,
@@ -177,7 +183,8 @@ class ResNet(nn.Module):
             prior_mean=prior_mu,
             prior_variance=prior_sigma,
             posterior_mu_init=posterior_mu_init,
-            posterior_rho_init=posterior_rho_init)
+            posterior_rho_init=posterior_rho_init,
+            prior_type=prior_type)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -187,7 +194,7 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, blocks, stride=1):
+    def _make_layer(self, block, planes, blocks, stride=1, prior_type=None):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -199,15 +206,16 @@ class ResNet(nn.Module):
                                          prior_variance=prior_sigma,
                                          posterior_mu_init=posterior_mu_init,
                                          posterior_rho_init=posterior_rho_init,
-                                         bias=False),
+                                         bias=False,
+                                         prior_type=prior_type),
                 BatchNorm2dLayer(planes * block.expansion),
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers.append(block(self.inplanes, planes, stride, downsample, prior_type = prior_type))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
+            layers.append(block(self.inplanes, planes, prior_type = prior_type))
 
         return nn.Sequential(*layers)
 
@@ -243,13 +251,15 @@ class ResNet(nn.Module):
         return x, kl_sum
 
 
-def resnet18(pretrained=False, **kwargs):
+# def resnet18(pretrained=False, prior_type = None, **kwargs):
+def resnet18(num_classes, pretrained=False, prior_type = None, args=None):
     """Constructs a ResNet-18 model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    # model = ResNet(BasicBlock, [2, 2, 2, 2], prior_type=prior_type, **kwargs)
+    model = ResNet(BasicBlock, [2, 2, 2, 2], prior_type=prior_type, args= args, num_classes=num_classes)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
     return model
