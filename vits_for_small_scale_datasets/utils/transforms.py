@@ -1,5 +1,3 @@
-# Credits to DeepVoltaire
-# github:DeepVoltaire/AutoAugment
 
 from PIL import Image, ImageEnhance, ImageOps
 import random

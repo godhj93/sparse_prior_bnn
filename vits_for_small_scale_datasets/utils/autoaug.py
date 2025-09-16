@@ -1,6 +1,3 @@
-# Credits to DeepVoltaire
-# github:DeepVoltaire/AutoAugment
-
 import numpy as np
 from .transforms import *
 

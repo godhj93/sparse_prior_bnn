@@ -1,15 +1,3 @@
-# Copyright (c) ByteDance, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-Mostly copy-paste from Swin-Transformer libarary:
-https://github.com/facebookresearch/dino
-https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py
-"""
-
 import os
 import logging
 import numpy as np
@@ -513,8 +501,6 @@ class PatchEmbed(nn.Module):
 
 class SwinTransformer(nn.Module):
     r""" Swin Transformer
-        A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
-          https://arxiv.org/pdf/2103.14030
     Args:
         img_size (int | tuple(int)): Input image size.
         patch_size (int | tuple(int)): Patch size.

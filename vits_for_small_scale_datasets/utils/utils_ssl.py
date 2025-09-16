@@ -573,9 +573,6 @@ def trunc_normal_(tensor, mean=0., std=1., a=-2., b=2.):
 
 
 class LARS(torch.optim.Optimizer):
-    """
-    Almost copy-paste from https://github.com/facebookresearch/barlowtwins/blob/main/main.py
-    """
     def __init__(self, params, lr=0, weight_decay=0, momentum=0.9, eta=0.001,
                  weight_decay_filter=None, lars_adaptation_filter=None):
         defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum,

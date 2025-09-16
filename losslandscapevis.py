@@ -16,11 +16,6 @@ def _save_npz(path: str, X, Y, ZA, ZB):
     np.savez_compressed(path, X=X, Y=Y, ZA=ZA, ZB=ZB)
 
 def _make_filterwise_direction(model: torch.nn.Module, device: str = "cuda") -> torch.Tensor:
-    """
-    Filter Normalization Method With Random Directions
-    https://github.com/tomgoldstein/loss-landscape/blob/master/net_plotter.py
-    ! Default of BN and Bias is zero
-    """
     dirs = []
     for W in model.parameters():               # [conv1_weight, conv1_bias, BN, conv2_weight, ...]
         if W.dim() >= 2:   

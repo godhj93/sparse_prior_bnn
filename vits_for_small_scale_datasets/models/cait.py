@@ -34,8 +34,6 @@ class PatchEmbed(nn.Module):
 
 
 class Class_Attention(nn.Module):
-    # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-    # with slight modifications to do CA 
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         self.num_heads = num_heads
@@ -70,8 +68,6 @@ class Class_Attention(nn.Module):
         return x_cls     
         
 class LayerScale_Block_CA(nn.Module):
-    # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-    # with slight modifications to add CA and LayerScale
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, Attention_block = Class_Attention,
                  Mlp_block=Mlp,init_values=1e-4):
@@ -100,8 +96,6 @@ class LayerScale_Block_CA(nn.Module):
         
         
 class Attention_talking_head(nn.Module):
-    # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-    # with slight modifications to add Talking Heads Attention (https://arxiv.org/pdf/2003.02436v1.pdf)
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         
@@ -143,8 +137,6 @@ class Attention_talking_head(nn.Module):
         return x
     
 class LayerScale_Block(nn.Module):
-    # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-    # with slight modifications to add layerScale
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm,Attention_block = Attention_talking_head,
                  Mlp_block=Mlp,init_values=1e-4):
@@ -168,8 +160,6 @@ class LayerScale_Block(nn.Module):
     
     
 class cait_models(nn.Module):
-    # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-    # with slight modifications to adapt to our cait models
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., norm_layer=nn.LayerNorm, global_pool=None,

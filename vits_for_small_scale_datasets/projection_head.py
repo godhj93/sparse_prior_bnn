@@ -1,9 +1,3 @@
-"""
-Mostly copy-paste from timm library.
-https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
-"""
-
-""" projection head for Self-supervised training """
 
 import math
 from functools import partial
