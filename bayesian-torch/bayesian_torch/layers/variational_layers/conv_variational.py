@@ -424,6 +424,25 @@ class Conv2dReparameterization(BaseVariationalLayer_):
                     t_loc = self.t_loc_bias,
                     t_scale = self.t_scale_bias
                 )
+        elif self.prior_type == 'spike-and-slab':
+            kl = self.kl_div_spike_and_slab(
+                mu_q = self.mu_kernel,
+                sigma_q = sigma_weight,
+                log_alpha = self.log_alpha,
+                mu_p = self.prior_weight_mu,
+                sigma_p = self.prior_weight_sigma,
+                pi_p = self.spike_and_slab_pi
+            )
+            if self.bias:
+                sigma_bias = torch.log1p(torch.exp(self.rho_bias))
+                kl += self.kl_div_spike_and_slab(
+                    mu_q = self.mu_bias,
+                    sigma_q = sigma_bias,
+                    log_alpha = self.log_alpha_bias,
+                    mu_p = self.prior_bias_mu,
+                    sigma_p = self.prior_bias_sigma,
+                    pi_p = self.spike_and_slab_pi
+                )
         else:
             kl = self.kl_div(
                 self.mu_kernel, sigma_weight, self.prior_weight_mu, self.prior_weight_sigma, prior_type = self.prior_type)

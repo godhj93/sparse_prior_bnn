@@ -25,7 +25,7 @@ from bayesian_torch.models.deterministic.resnet_large import resnet18 as resnet1
 from bayesian_torch.models.bayesian.resnet_variational_large import resnet18 as resnet18_bayesian
 from bayesian_torch.models.bayesian.densenet_variational import densenet_bc_30_uni
 from bayesian_torch.models.deterministic.densenet import densenet_bc_30
-from bayesian_torch.models.deterministic.densenet import densenet_bc_121
+#from bayesian_torch.models.deterministic.densenet import densenet_bc_121
 from bayesian_torch.models.deterministic.mobilenet import MobileNet
 from bayesian_torch.models.bayesian.mobilenet_uni import MobileNet_uni
 from bayesian_torch.models.deterministic.vit_tiny_dnn import ViT_Tiny_dnn, vit_tiny_dnn

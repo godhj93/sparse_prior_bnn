@@ -120,7 +120,7 @@ def main(args):
 
                 if args.optimizer == 'sgd':
                     optim = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov = args.nesterov)
-                elif args.optimizer == 'adam':
+                elif args.optimizer == 'adamw':
                     optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
                 # -----------------------------------------------
                 else:
