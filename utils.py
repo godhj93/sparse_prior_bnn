@@ -554,27 +554,67 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
         for batch_idx, (data, target) in pbar:
     
             data, target = data.to(device), target.to(device)
-            outputs =[]
-            kls = []
             
-            for _ in range(1): # For training, mc_runs is set to 1
-                output, kl = model(data)
-                outputs.append(output)
-                kls.append(kl)
-            
-            output = torch.mean(torch.stack(outputs), dim=0)
-            kl_loss = torch.mean(torch.stack(kls), dim=0).mean()
-            
-            _, predicted = torch.max(output.data, 1)
-            
-            nll = F.cross_entropy(output, target)
-            scaled_kl = kl_loss / scaling
-            loss = nll * (1/args.t) + scaled_kl#N # args.t: Cold posterior temperature
-            # loss = nll
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
+            if args.model in ['vit-tiny-layernorm-original']:
+                from vits_for_small_scale_datasets.utils.mix import cutmix_data, mixup_data, mixup_criterion
+                from vits_for_small_scale_datasets.utils.losses import LabelSmoothingCrossEntropy
+                criterion = LabelSmoothingCrossEntropy()
+                # print("Using CutMix or MixUp")
+                np.int = int
+                args.alpha = 1.0
+                args.beta = 1.0
+                r = np.random.rand(1)
+                if r < 0.5:
+                    switching_prob = np.random.rand(1)
+                    
+                    # Cutmix
+                    if switching_prob < 0.5:
+                        slicing_idx, y_a, y_b, lam, sliced = cutmix_data(data, target, args)
+                        data[:, :, slicing_idx[0]:slicing_idx[2], slicing_idx[1]:slicing_idx[3]] = sliced
+                        output, kl = model(data)
+                        
+                        nll =  mixup_criterion(criterion, output, y_a, y_b, lam)
+                        
+                    # Mixup
+                    else:
+                        data, y_a, y_b, lam = mixup_data(data, target, args)
+                        output, kl = model(data)
+                        nll = mixup_criterion(F.cross_entropy, output, y_a, y_b, lam)
+                else:
+                    output, kl = model(data)
+                    nll = criterion(output, target)
+                
+                _, predicted = torch.max(output.data, 1)
+                
+                scaled_kl = kl / scaling
+                loss = nll * (1/args.t) + scaled_kl#N # args.t: Cold posterior temperature
+                # loss = nll
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                print("Hi")
+            else:
+                outputs =[]
+                kls = []
+                
+                for _ in range(1): # For training, mc_runs is set to 1
+                    output, kl = model(data)
+                    outputs.append(output)
+                    kls.append(kl)
+                
+                output = torch.mean(torch.stack(outputs), dim=0)
+                kl_loss = torch.mean(torch.stack(kls), dim=0).mean()
+                
+                _, predicted = torch.max(output.data, 1)
+                
+                nll = F.cross_entropy(output, target)
+                scaled_kl = kl_loss / scaling
+                loss = nll * (1/args.t) + scaled_kl#N # args.t: Cold posterior temperature
+                # loss = nll
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
             nll_total.append(nll.detach().cpu())
             kl_total.append(scaled_kl.detach().cpu())
             
