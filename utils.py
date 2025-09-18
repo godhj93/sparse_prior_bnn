@@ -592,7 +592,6 @@ def train_BNN(epoch, model, train_loader, test_loader, optimizer, writer, args, 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                print("Hi")
             else:
                 outputs =[]
                 kls = []
