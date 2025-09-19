@@ -34,7 +34,7 @@ python train.py --type uni --model [resnet20, densenet30, vit-tiny-layernorm-mic
 - **Train a Bayesian Neural Network with SPIN**: Train a Bayesian neural network with empirical priors derived from the pruned model.
 
 ```
-python train_with_good_prior.py --type uni --model [resnet20, densenet30, vit-tiny-layernorm-micro, resnet18, mobilenet] --dataset [cifar10, cifar100, tinyimagenet] --ood [cifar100, tinyimagenet] --optimizer sgd --bs 128 --lr 0.1 --epochs 90 --weight_decay 0.0 --momentum 0.9 --prior [normal, laplace, student-t, spike-and-slab] --weight "path of sparse model --std 0.001"
+python train_with_good_prior.py --type uni --model [resnet20, densenet30, vit-tiny-layernorm-micro, resnet18, mobilenet] --dataset [cifar10, cifar100, tinyimagenet] --ood [cifar100, tinyimagenet] --optimizer sgd --bs 128 --lr 0.1 --epochs 90 --weight_decay 0.0 --momentum 0.9 --prior normal --weight "path of sparse model --std 0.001"
 # Here, std is the hyperparameter that controls the variance of the empirical prior.
 ```
 
@@ -43,3 +43,5 @@ python train_with_good_prior.py --type uni --model [resnet20, densenet30, vit-ti
 ```
 python test.py --type [dnn, uni] --model [resnet20, densenet30, vit-tiny-layernorm-micro, resnet18, mobilenet] --dataset [cifar10, cifar100, tinyimagenet] --ood [cifar100, tinyimagenet] --weight "path of trained model" --prior [normal, laplace, student-t, spike-and-slab] 
 ```
+
+
