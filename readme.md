@@ -8,6 +8,8 @@ This repository contains the PyTorch implementation of the paper "Empirical Prio
 
 ```bash
 conda create -n spin python=3.10 -y
+cd bayesian-torch && pip install .
+cd ..
 pip install -r requirements.txt
 ```
 
