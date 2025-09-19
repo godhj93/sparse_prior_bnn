@@ -47,11 +47,11 @@ def main(args):
     
     if args.model == 'vit-tiny-layernorm-original':
         from vits_for_small_scale_datasets.utils.scheduler import build_scheduler
-        args.optimizer = 'adamw'
-        args.lr = 1e-3
-        args.weight_decay = 5e-2
-        optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        args.scheduler = build_scheduler(args, optim, len(train_loader))
+        # args.optimizer = 'adamw'
+        # args.lr = 1e-3
+        # args.weight_decay = 5e-2
+        # optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        # args.scheduler = build_scheduler(args, optim, len(train_loader))
         
     log_params = {
         'model': args.model,

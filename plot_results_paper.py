@@ -18,7 +18,7 @@ def plot_metrics(csv_path):
 
     # 데이터 타입 변환 (moped가 문자열 'True'/'False'로 읽힐 수 있음)
     if df['moped'].dtype == 'O':
-         df['moped'] = df['moped'].apply(lambda x: x.strip().lower() == 'true')
+         pass #df['moped'] = df['moped'].apply(lambda x: x.strip().lower() == 'true')
 
 
     # --- 데이터 분리 ---

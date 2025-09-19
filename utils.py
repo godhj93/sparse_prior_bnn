@@ -776,7 +776,7 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
                 loss.backward()
                 _, predicted = torch.max(output.data, 1)
                 optimizer.step()
-                args.scheduler.step()
+                # args.scheduler.step()
                 
             else:
                 optimizer.zero_grad()
@@ -794,7 +794,7 @@ def train_DNN(epoch, model, train_loader, test_loader, optimizer, device, writer
 
             # writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], batch_idx + e * len(train_loader))
             
-        # args.scheduler.step()
+        args.scheduler.step()
         acc_test, nll_test = test_DNN(model, test_loader, device, args)
         logger.info(f"[Test] Acc: {acc_test:.3f}, NLL: {nll_test:.3f}")
         
